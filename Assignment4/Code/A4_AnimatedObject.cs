@@ -8,8 +8,11 @@ public partial class A4_AnimatedObject : Node3D
     [Export] private A4_ObjectSwitcher objectSwitcher; // Reference to object switcher
     
     [Export] private CanvasLayer ui;  // Expose the UI in the Inspector
+    [Export] private Control uiControl;
 
     public CanvasLayer GetUI() => ui;  // Allow `MainScene` to toggle UI visibility
+
+    public Control GetControl() => uiControl;
     
 
     private List<KeyframeData> keyframes = new();
@@ -18,6 +21,8 @@ public partial class A4_AnimatedObject : Node3D
     private int easingType = 2;  // Default: Ease Out
     
     [Export] private A4_SwapParticle particleEffect;
+    
+    public A4_ObjectSwitcher GetObjectSwitcher() => objectSwitcher;
 
     public override void _Ready()
     {

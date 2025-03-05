@@ -28,6 +28,7 @@ public partial class A4_MainScene : Node3D
         }
 
         AddAnimatedObject(new Vector3(0, 0, 0));
+        AddAnimatedObject(new Vector3(5, 0, 0));
     }
 
     public void AddAnimatedObject(Vector3 position)
@@ -41,6 +42,8 @@ public partial class A4_MainScene : Node3D
         A4_AnimatedObject newObject = AnimatedObjectScene.Instantiate<A4_AnimatedObject>();
         AddChild(newObject);
         newObject.GlobalPosition = position;
+
+        newObject.GetObjectSwitcher().MoveModels(position);
 
         animatedObjects.Add(newObject);
     }

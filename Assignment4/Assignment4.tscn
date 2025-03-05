@@ -9,10 +9,33 @@ script = ExtResource("1_5u4gv")
 AnimatedObjectScene = ExtResource("1_ijd63")
 camera = NodePath("Camera3D")
 
-[node name="Camera3D" type="Camera3D" parent="." node_paths=PackedStringArray("rootNode")]
+[node name="Camera3D" type="Camera3D" parent="." node_paths=PackedStringArray("rootNode", "selectionStatusLabel")]
 transform = Transform3D(1, 0, 0, 0, 0.983493, 0.180948, 0, -0.180948, 0.983493, 0, 0.436498, 1.58287)
 script = ExtResource("2_kapam")
 rootNode = NodePath("..")
+selectionStatusLabel = NodePath("../CanvasLayer/Control/Panel/Label")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 2, 2)
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="Control" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Panel" type="Panel" parent="CanvasLayer/Control"]
+layout_mode = 0
+offset_left = 404.0
+offset_top = 4.0
+offset_right = 786.0
+offset_bottom = 44.0
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = -1.0
+offset_right = 382.0
+offset_bottom = 44.0

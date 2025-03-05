@@ -32,10 +32,11 @@ material = SubResource("StandardMaterial3D_h5es7")
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_h5es7"]
 
-[node name="Animated_Object" type="Node3D" node_paths=PackedStringArray("objectSwitcher", "ui", "particleEffect")]
+[node name="Animated_Object" type="Node3D" node_paths=PackedStringArray("objectSwitcher", "ui", "uiControl", "particleEffect")]
 script = ExtResource("1_u34nf")
 objectSwitcher = NodePath("Object")
 ui = NodePath("UI")
+uiControl = NodePath("UI/Control")
 particleEffect = NodePath("Swap Particle")
 
 [node name="Object" type="Node" parent="."]
