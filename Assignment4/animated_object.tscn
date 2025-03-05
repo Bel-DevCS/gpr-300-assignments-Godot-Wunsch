@@ -1,0 +1,155 @@
+[gd_scene load_steps=21 format=3 uid="uid://de4mwo7vme1u3"]
+
+[ext_resource type="Script" uid="uid://ybvuwt4suaa7" path="res://Assignment4/Code/A4_ObjectSwitcher.cs" id="1_kk6mr"]
+[ext_resource type="Script" uid="uid://dhqgrited5p1d" path="res://Assignment4/Code/A4_AnimatedObject.cs" id="1_u34nf"]
+[ext_resource type="ArrayMesh" uid="uid://db0dl6yacarl6" path="res://Assignment4/Assets/Models/AnimatedChest.obj" id="2_u34nf"]
+[ext_resource type="ArrayMesh" uid="uid://bh5srpxr0khb1" path="res://Assignment4/Assets/Models/Barrel.obj" id="3_h5es7"]
+[ext_resource type="ArrayMesh" uid="uid://bd8my4if6aulg" path="res://Assignment4/Assets/Models/Book.obj" id="4_3bg8t"]
+[ext_resource type="ArrayMesh" uid="uid://b4wdlg6w7g10e" path="res://Assignment4/Assets/Models/IceStaff.obj" id="5_oihr5"]
+[ext_resource type="ArrayMesh" uid="uid://c8trxykysctda" path="res://Assignment4/Assets/Models/KnightHelmet.obj" id="7_lhbbq"]
+[ext_resource type="ArrayMesh" uid="uid://cpdy2kfngbhsm" path="res://Assignment4/Assets/Models/Rollofpaper.obj" id="8_fhvo7"]
+[ext_resource type="ArrayMesh" uid="uid://5idg7lrfc0s1" path="res://Assignment4/Assets/Models/Scroll.obj" id="9_irril"]
+[ext_resource type="ArrayMesh" uid="uid://d3fjr1m3bmy2b" path="res://Assignment4/Assets/Models/Shield.obj" id="10_eeudb"]
+[ext_resource type="ArrayMesh" uid="uid://dkm8hxuhe5w4j" path="res://Assignment4/Assets/Models/Staff.obj" id="11_w23a8"]
+[ext_resource type="ArrayMesh" uid="uid://bvsl5qc0ttuk6" path="res://Assignment4/Assets/Models/Sword.obj" id="12_3yc4d"]
+[ext_resource type="ArrayMesh" uid="uid://cqmsjotsut54u" path="res://Assignment4/Assets/Models/WoodenStaff.obj" id="13_ef25i"]
+[ext_resource type="Script" uid="uid://p85ghg1ab6as" path="res://Assignment4/Code/A4_AnimatedObjectUI.cs" id="14_u34nf"]
+[ext_resource type="Script" uid="uid://dwa6l4d1hqucd" path="res://Assignment4/Code/A4_SwapParticle.cs" id="15_h5es7"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_d1j14"]
+resource_local_to_scene = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_u34nf"]
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_u34nf"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_h5es7"]
+vertex_color_use_as_albedo = true
+albedo_color = Color(0.407417, 0.428266, 0.434294, 1)
+
+[sub_resource type="RibbonTrailMesh" id="RibbonTrailMesh_h5es7"]
+material = SubResource("StandardMaterial3D_h5es7")
+
+[node name="Animated_Object" type="Node3D" node_paths=PackedStringArray("objectSwitcher", "particleEffect")]
+script = ExtResource("1_u34nf")
+objectSwitcher = NodePath("Object")
+particleEffect = NodePath("Swap Particle")
+
+[node name="Object" type="Node" parent="."]
+script = ExtResource("1_kk6mr")
+
+[node name="Sphere" type="MeshInstance3D" parent="Object"]
+mesh = SubResource("SphereMesh_d1j14")
+surface_material_override/0 = SubResource("StandardMaterial3D_u34nf")
+
+[node name="Chest" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.3, 0, 0, 0, 0.3, 0, 0, 0, 0.3, -0.516332, 0.11556, -0.42402)
+visible = false
+mesh = ExtResource("2_u34nf")
+skeleton = NodePath("../..")
+
+[node name="Barrel" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.25, 0, 0, 0, 0.25, 0, 0, 0, 0.25, -0.028, 0, 0)
+visible = false
+mesh = ExtResource("3_h5es7")
+skeleton = NodePath("../..")
+
+[node name="Book" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.056841, 0.170572, 0)
+visible = false
+mesh = ExtResource("4_3bg8t")
+skeleton = NodePath("../..")
+
+[node name="Dagger" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+visible = false
+mesh = ExtResource("5_oihr5")
+skeleton = NodePath("../..")
+
+[node name="Ice Staff" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+visible = false
+mesh = ExtResource("5_oihr5")
+skeleton = NodePath("../..")
+
+[node name="Helmet" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, -0.193009, -0.227214, -0.128738)
+visible = false
+mesh = ExtResource("7_lhbbq")
+skeleton = NodePath("../..")
+
+[node name="Paper Roll" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+visible = false
+mesh = ExtResource("8_fhvo7")
+skeleton = NodePath("../..")
+
+[node name="Scroll" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+visible = false
+mesh = ExtResource("9_irril")
+skeleton = NodePath("../..")
+
+[node name="Shield" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+visible = false
+mesh = ExtResource("10_eeudb")
+skeleton = NodePath("../..")
+
+[node name="Staff" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
+visible = false
+mesh = ExtResource("11_w23a8")
+skeleton = NodePath("../..")
+
+[node name="Sword" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, -0.453724, 0)
+visible = false
+mesh = ExtResource("12_3yc4d")
+skeleton = NodePath("../..")
+
+[node name="Wooden Staff" type="MeshInstance3D" parent="Object"]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, -0.158103, 0)
+visible = false
+mesh = ExtResource("13_ef25i")
+skeleton = NodePath("../..")
+
+[node name="UI" type="CanvasLayer" parent="." node_paths=PackedStringArray("MaterialPanel", "ObjectNode", "animatedObject", "PRSPanel", "MeshSelectorPanel", "KeyframePanel")]
+script = ExtResource("14_u34nf")
+MaterialPanel = NodePath("Mat Panel")
+ObjectNode = NodePath("../Object")
+animatedObject = NodePath("..")
+PRSPanel = NodePath("PRS Panel")
+MeshSelectorPanel = NodePath("Mesh Selector")
+KeyframePanel = NodePath("Keyframe Panel")
+
+[node name="Mat Panel" type="Panel" parent="UI"]
+offset_right = 319.0
+offset_bottom = 321.0
+
+[node name="PRS Panel" type="Panel" parent="UI"]
+offset_left = 5.0
+offset_top = 347.0
+offset_right = 315.0
+offset_bottom = 635.0
+
+[node name="Mesh Selector" type="Panel" parent="UI"]
+offset_left = 7.0
+offset_top = 659.0
+offset_right = 315.0
+offset_bottom = 939.0
+
+[node name="Keyframe Panel" type="Panel" parent="UI"]
+anchors_preset = -1
+anchor_right = 0.226
+anchor_bottom = 0.314
+offset_left = 809.0
+offset_top = 9.0
+offset_right = 887.648
+offset_bottom = 122.528
+
+[node name="Swap Particle" type="GPUParticles3D" parent="."]
+emitting = false
+process_material = SubResource("ParticleProcessMaterial_u34nf")
+draw_pass_1 = SubResource("RibbonTrailMesh_h5es7")
+script = ExtResource("15_h5es7")

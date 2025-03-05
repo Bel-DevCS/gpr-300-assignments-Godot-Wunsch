@@ -1,0 +1,9 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://lfkcowunby06"]
+
+[ext_resource type="Shader" uid="uid://ddvgf4b5qmd7q" path="res://Assignment2/Assets/Shaders/depth-test.gdshader" id="1_nnikf"]
+
+[resource]
+render_priority = 0
+shader = ExtResource("1_nnikf")
+shader_parameter/camera_near = 0.1
+shader_parameter/camera_far = 1000.0

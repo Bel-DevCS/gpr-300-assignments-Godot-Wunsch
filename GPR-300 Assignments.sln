@@ -1,0 +1,19 @@
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GPR-300 Assignments", "GPR-300 Assignments.csproj", "{CD45A742-646F-4508-B64E-D57A8CC8AD79}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+	Debug|Any CPU = Debug|Any CPU
+	ExportDebug|Any CPU = ExportDebug|Any CPU
+	ExportRelease|Any CPU = ExportRelease|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{CD45A742-646F-4508-B64E-D57A8CC8AD79}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CD45A742-646F-4508-B64E-D57A8CC8AD79}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CD45A742-646F-4508-B64E-D57A8CC8AD79}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
+		{CD45A742-646F-4508-B64E-D57A8CC8AD79}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
+		{CD45A742-646F-4508-B64E-D57A8CC8AD79}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{CD45A742-646F-4508-B64E-D57A8CC8AD79}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
+	EndGlobalSection
+EndGlobal
