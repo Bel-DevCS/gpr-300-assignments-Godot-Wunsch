@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://de4mwo7vme1u3"]
+[gd_scene load_steps=22 format=3 uid="uid://de4mwo7vme1u3"]
 
 [ext_resource type="Script" uid="uid://ybvuwt4suaa7" path="res://Assignment4/Code/A4_ObjectSwitcher.cs" id="1_kk6mr"]
 [ext_resource type="Script" uid="uid://dhqgrited5p1d" path="res://Assignment4/Code/A4_AnimatedObject.cs" id="1_u34nf"]
@@ -30,9 +30,12 @@ albedo_color = Color(0.407417, 0.428266, 0.434294, 1)
 [sub_resource type="RibbonTrailMesh" id="RibbonTrailMesh_h5es7"]
 material = SubResource("StandardMaterial3D_h5es7")
 
-[node name="Animated_Object" type="Node3D" node_paths=PackedStringArray("objectSwitcher", "particleEffect")]
+[sub_resource type="BoxShape3D" id="BoxShape3D_h5es7"]
+
+[node name="Animated_Object" type="Node3D" node_paths=PackedStringArray("objectSwitcher", "ui", "particleEffect")]
 script = ExtResource("1_u34nf")
 objectSwitcher = NodePath("Object")
+ui = NodePath("UI")
 particleEffect = NodePath("Swap Particle")
 
 [node name="Object" type="Node" parent="."]
@@ -116,40 +119,53 @@ skeleton = NodePath("../..")
 
 [node name="UI" type="CanvasLayer" parent="." node_paths=PackedStringArray("MaterialPanel", "ObjectNode", "animatedObject", "PRSPanel", "MeshSelectorPanel", "KeyframePanel")]
 script = ExtResource("14_u34nf")
-MaterialPanel = NodePath("Mat Panel")
+MaterialPanel = NodePath("Control/Mat Panel")
 ObjectNode = NodePath("../Object")
 animatedObject = NodePath("..")
-PRSPanel = NodePath("PRS Panel")
-MeshSelectorPanel = NodePath("Mesh Selector")
-KeyframePanel = NodePath("Keyframe Panel")
+PRSPanel = NodePath("Control/PRS Panel")
+MeshSelectorPanel = NodePath("Control/Mesh Selector")
+KeyframePanel = NodePath("Control/Keyframe Panel")
 
-[node name="Mat Panel" type="Panel" parent="UI"]
+[node name="Control" type="Control" parent="UI"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Mat Panel" type="Panel" parent="UI/Control"]
 offset_right = 319.0
 offset_bottom = 321.0
 
-[node name="PRS Panel" type="Panel" parent="UI"]
+[node name="PRS Panel" type="Panel" parent="UI/Control"]
 offset_left = 5.0
 offset_top = 347.0
 offset_right = 315.0
 offset_bottom = 635.0
 
-[node name="Mesh Selector" type="Panel" parent="UI"]
+[node name="Mesh Selector" type="Panel" parent="UI/Control"]
 offset_left = 7.0
 offset_top = 659.0
 offset_right = 315.0
 offset_bottom = 939.0
 
-[node name="Keyframe Panel" type="Panel" parent="UI"]
+[node name="Keyframe Panel" type="Panel" parent="UI/Control"]
+layout_mode = 1
 anchors_preset = -1
 anchor_right = 0.226
 anchor_bottom = 0.314
 offset_left = 809.0
 offset_top = 9.0
-offset_right = 887.648
-offset_bottom = 122.528
+offset_right = 1150.96
+offset_bottom = 287.44
 
 [node name="Swap Particle" type="GPUParticles3D" parent="."]
 emitting = false
 process_material = SubResource("ParticleProcessMaterial_u34nf")
 draw_pass_1 = SubResource("RibbonTrailMesh_h5es7")
 script = ExtResource("15_h5es7")
+
+[node name="StaticBody3D" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
+shape = SubResource("BoxShape3D_h5es7")
+debug_color = Color(0, 0.6, 0.7, 0.42)

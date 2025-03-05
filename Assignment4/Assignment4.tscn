@@ -1,15 +1,18 @@
-[gd_scene load_steps=3 format=3 uid="uid://fny6cvf6x6ye"]
+[gd_scene load_steps=4 format=3 uid="uid://fny6cvf6x6ye"]
 
+[ext_resource type="Script" uid="uid://cf46dv21dhcob" path="res://Assignment4/Code/A4_MainScene.cs" id="1_5u4gv"]
 [ext_resource type="PackedScene" uid="uid://de4mwo7vme1u3" path="res://Assignment4/animated_object.tscn" id="1_ijd63"]
 [ext_resource type="Script" uid="uid://nt1rje1vvsom" path="res://Assignment4/Code/A4_CameraController.cs" id="2_kapam"]
 
-[node name="Node3D" type="Node3D"]
+[node name="Node3D" type="Node3D" node_paths=PackedStringArray("camera")]
+script = ExtResource("1_5u4gv")
+AnimatedObjectScene = ExtResource("1_ijd63")
+camera = NodePath("Camera3D")
 
-[node name="Animated_Object" parent="." instance=ExtResource("1_ijd63")]
-
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="." node_paths=PackedStringArray("rootNode")]
 transform = Transform3D(1, 0, 0, 0, 0.983493, 0.180948, 0, -0.180948, 0.983493, 0, 0.436498, 1.58287)
 script = ExtResource("2_kapam")
+rootNode = NodePath("..")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 2, 2)

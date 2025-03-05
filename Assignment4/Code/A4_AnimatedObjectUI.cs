@@ -2,7 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 
-public partial class A4_AnimatedObjectUI : Node
+public partial class A4_AnimatedObjectUI : CanvasLayer
 {
     [Export] private Panel MaterialPanel; // UI Panel
     [Export] private Node ObjectNode; // Object Switcher

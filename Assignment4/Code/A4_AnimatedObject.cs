@@ -6,6 +6,11 @@ using System.Linq;
 public partial class A4_AnimatedObject : Node3D
 {
     [Export] private A4_ObjectSwitcher objectSwitcher; // Reference to object switcher
+    
+    [Export] private CanvasLayer ui;  // Expose the UI in the Inspector
+
+    public CanvasLayer GetUI() => ui;  // Allow `MainScene` to toggle UI visibility
+    
 
     private List<KeyframeData> keyframes = new();
     private float currentTime = 0f;
@@ -14,6 +19,10 @@ public partial class A4_AnimatedObject : Node3D
     
     [Export] private A4_SwapParticle particleEffect;
 
+    public override void _Ready()
+    {
+        SetUIVisibility(false);
+    }
     public override void _Process(double delta)
     {
         if (!isPlaying) return; // ✅ Stop updates when paused
@@ -29,6 +38,13 @@ public partial class A4_AnimatedObject : Node3D
         ApplyInterpolatedFrame(currentTime);
     }
 
+    public void SetUIVisibility(bool visible)
+    {
+        if (ui != null)
+        {
+            ui.Visible = visible;
+        }
+    }
 
     public bool IsPlaying() => isPlaying;
 
@@ -56,9 +72,7 @@ public partial class A4_AnimatedObject : Node3D
 
         GD.Print($"Keyframe Added at {newKeyframeTime}s | Total Keyframes: {keyframes.Count}");
     }
-
-
-
+    
 
 
     public void RemoveLastKeyframe()
@@ -179,8 +193,6 @@ public partial class A4_AnimatedObject : Node3D
         }
 
     }
-
-
 
 
 
