@@ -5,39 +5,54 @@ using System.Linq;
 
 public partial class A4_AnimatedObject : Node3D
 {
-    [Export] private A4_ObjectSwitcher objectSwitcher; // Reference to object switcher
-    
-    [Export] private CanvasLayer ui;  // Expose the UI in the Inspector
+    [Export] private A4_ObjectSwitcher objectSwitcher;
+    [Export] private CanvasLayer ui;
     [Export] private Control uiControl;
-
-    public CanvasLayer GetUI() => ui;  // Allow `MainScene` to toggle UI visibility
-
-    public Control GetControl() => uiControl;
-    
+    [Export] private A4_SwapParticle particleEffect;
 
     private List<KeyframeData> keyframes = new();
     private float currentTime = 0f;
     private bool isPlaying = false;
-    private int easingType = 2;  // Default: Ease Out
+    private int easingType = 2; 
+    private int originalModelIndex = -1;
+
     
-    [Export] private A4_SwapParticle particleEffect;
-    
+    [Export] private bool loop = false;
+    [Export] private float playbackSpeed = 1.0f; 
+
+    public CanvasLayer GetUI() => ui;
+    public Control GetControl() => uiControl;
     public A4_ObjectSwitcher GetObjectSwitcher() => objectSwitcher;
+    
+    public int GetEasingType() => easingType;
 
     public override void _Ready()
     {
         SetUIVisibility(false);
     }
+
     public override void _Process(double delta)
     {
-        if (!isPlaying) return; // ✅ Stop updates when paused
+        if (!isPlaying) return;
 
-        currentTime += (float)delta;
+        currentTime += (float)delta * playbackSpeed; // Apply playback speed
 
-        if (keyframes.Count > 0 && currentTime > keyframes[keyframes.Count - 1].Time)
+        if (keyframes.Count > 0)
         {
-            isPlaying = false;  // Stop if we pass the last keyframe
-            currentTime = keyframes[keyframes.Count - 1].Time;
+            float lastKeyframeTime = keyframes[keyframes.Count - 1].Time;
+
+            if (currentTime > lastKeyframeTime)
+            {
+                if (loop)
+                {
+                    currentTime = keyframes[0].Time; // Restart from beginning
+                }
+                else
+                {
+                    isPlaying = false;
+                    currentTime = lastKeyframeTime;
+                }
+            }
         }
 
         ApplyInterpolatedFrame(currentTime);
@@ -53,13 +68,11 @@ public partial class A4_AnimatedObject : Node3D
 
     public bool IsPlaying() => isPlaying;
 
-
     public void AddKeyframe()
     {
         if (objectSwitcher == null) return;
 
         float newKeyframeTime = currentTime;
-
         string currentMeshName = objectSwitcher.GetCurrentModel()?.Name ?? "Unknown";
 
         KeyframeData newKeyframe = new KeyframeData(
@@ -70,15 +83,14 @@ public partial class A4_AnimatedObject : Node3D
             objectSwitcher.GetAllMaterials().Count > 0 && objectSwitcher.GetAllMaterials()[0] is StandardMaterial3D mat
                 ? mat.AlbedoColor
                 : Colors.White,
-            currentMeshName);
+            currentMeshName
+        );
 
         keyframes.Add(newKeyframe);
         keyframes.Sort((a, b) => a.Time.CompareTo(b.Time));
 
         GD.Print($"Keyframe Added at {newKeyframeTime}s | Total Keyframes: {keyframes.Count}");
     }
-    
-
 
     public void RemoveLastKeyframe()
     {
@@ -89,8 +101,6 @@ public partial class A4_AnimatedObject : Node3D
         }
     }
 
-    private int originalModelIndex = -1; // Store initial model
-
     public void PlayAnimation()
     {
         if (keyframes.Count < 2)
@@ -99,9 +109,9 @@ public partial class A4_AnimatedObject : Node3D
             return;
         }
 
-        if (originalModelIndex == -1) // Store original model only once
+        if (originalModelIndex == -1)
             originalModelIndex = objectSwitcher.GetMeshNames().IndexOf(objectSwitcher.GetCurrentModel().Name);
-        
+
         currentTime = keyframes[0].Time;
         ApplyInterpolatedFrame(currentTime);
         isPlaying = true;
@@ -115,16 +125,35 @@ public partial class A4_AnimatedObject : Node3D
         if (originalModelIndex != -1)
         {
             objectSwitcher.SetModel(originalModelIndex);
-            originalModelIndex = -1; // Reset
+            originalModelIndex = -1;
         }
     }
 
+    public void ResetAnimation()
+    {
+        isPlaying = false;
+        currentTime = keyframes.Count > 0 ? keyframes[0].Time : 0f;
+        ApplyInterpolatedFrame(currentTime);
+        GD.Print("Animation Reset.");
+    }
+
+    public void SetPlaybackSpeed(float speed)
+    {
+        playbackSpeed = Mathf.Max(0.1f, speed); // Prevent 0x or negative speeds
+        GD.Print($"Playback Speed Set to: {playbackSpeed}x");
+    }
+
+    public void SetLoop(bool enable)
+    {
+        loop = enable;
+        GD.Print($"Looping Set to: {loop}");
+    }
 
     public void SetTime(float newTime)
     {
-        if (keyframes.Count == 0) return;  
+        if (keyframes.Count == 0) return;
 
-        currentTime = newTime; // 🔹 Ensure manual edits in UI update `currentTime`
+        currentTime = newTime;
 
         if (keyframes.Count == 1)
         {
@@ -140,9 +169,6 @@ public partial class A4_AnimatedObject : Node3D
             ApplyInterpolatedFrame(currentTime);
         }
     }
-
-
-
 
     public void SetEasingType(int type)
     {
@@ -180,15 +206,11 @@ public partial class A4_AnimatedObject : Node3D
         objectSwitcher.SetScale(previous.Scale.Lerp(next.Scale, t));
         objectSwitcher.ChangeMaterialColor(0, previous.MaterialColor.Lerp(next.MaterialColor, t));
 
-        //  Check if a model change is needed
         if (previous.MeshName != next.MeshName)
         {
-            if (t >= 0.4f)
+            if (t >= 0.4f && particleEffect != null)
             {
-                if (particleEffect != null)
-                {
-                    particleEffect.TriggerEffect(objectSwitcher.GetCurrentModel().GlobalTransform.Origin);
-                }
+                particleEffect.TriggerEffect(objectSwitcher.GetCurrentModel().GlobalTransform.Origin);
             }
 
             if (t >= 0.5f)
@@ -196,10 +218,7 @@ public partial class A4_AnimatedObject : Node3D
                 objectSwitcher.SetModel(objectSwitcher.GetMeshNames().IndexOf(next.MeshName));
             }
         }
-
     }
-
-
 
     private float ApplyEasingFunction(float t)
     {
@@ -212,7 +231,7 @@ public partial class A4_AnimatedObject : Node3D
             _ => t,
         };
     }
-    
+
     public void SetToCurrentKeyframe()
     {
         if (objectSwitcher == null || keyframes.Count == 0) return;
@@ -233,7 +252,6 @@ public partial class A4_AnimatedObject : Node3D
     {
         if (keyframes.Count == 0) return null;
 
-        // 🔹 Find the closest keyframe to `currentTime`
         KeyframeData closestKeyframe = keyframes[0];
         float closestTimeDifference = Mathf.Abs(closestKeyframe.Time - currentTime);
 
@@ -259,17 +277,14 @@ public partial class A4_AnimatedObject : Node3D
 
         if (keyframes.Count == 0)
         {
-            currentTime = 0;  // 🔹 Reset time if no keyframes remain
+            currentTime = 0;
             isPlaying = false;
         }
         else
         {
-            // 🔹 Snap to the closest keyframe after deletion
             SetTime(currentTime);
         }
     }
-    
-
 
     public float GetCurrentTime() => currentTime;
     public List<KeyframeData> GetKeyframes() => keyframes;

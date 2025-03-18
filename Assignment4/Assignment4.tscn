@@ -4,16 +4,20 @@
 [ext_resource type="PackedScene" uid="uid://de4mwo7vme1u3" path="res://Assignment4/animated_object.tscn" id="1_ijd63"]
 [ext_resource type="Script" uid="uid://nt1rje1vvsom" path="res://Assignment4/Code/A4_CameraController.cs" id="2_kapam"]
 
-[node name="Node3D" type="Node3D" node_paths=PackedStringArray("camera")]
+[node name="Node3D" type="Node3D" node_paths=PackedStringArray("camera", "_Play", "_Pause", "_Loop", "_PlaybackSpeed")]
 script = ExtResource("1_5u4gv")
 AnimatedObjectScene = ExtResource("1_ijd63")
 camera = NodePath("Camera3D")
+_Play = NodePath("CanvasLayer/Control/Panel/HBoxContainer/Play")
+_Pause = NodePath("CanvasLayer/Control/Panel/HBoxContainer/Pause")
+_Loop = NodePath("CanvasLayer/Control/Panel/HBoxContainer/CheckButton")
+_PlaybackSpeed = NodePath("CanvasLayer/Control/Panel/HBoxContainer/SpinBox")
 
 [node name="Camera3D" type="Camera3D" parent="." node_paths=PackedStringArray("rootNode", "selectionStatusLabel")]
 transform = Transform3D(1, 0, 0, 0, 0.983493, 0.180948, 0, -0.180948, 0.983493, 0, 0.436498, 1.58287)
 script = ExtResource("2_kapam")
 rootNode = NodePath("..")
-selectionStatusLabel = NodePath("../CanvasLayer/Control/Panel/Label")
+selectionStatusLabel = NodePath("../CanvasLayer/Control/Select/Label")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 2, 2)
@@ -26,16 +30,47 @@ anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 
-[node name="Panel" type="Panel" parent="CanvasLayer/Control"]
+[node name="Select" type="Panel" parent="CanvasLayer/Control"]
 layout_mode = 0
 offset_left = 404.0
 offset_top = 4.0
 offset_right = 786.0
 offset_bottom = 44.0
 
-[node name="Label" type="Label" parent="CanvasLayer/Control/Panel"]
+[node name="Label" type="Label" parent="CanvasLayer/Control/Select"]
 layout_mode = 0
 offset_left = 4.0
 offset_top = -1.0
 offset_right = 382.0
 offset_bottom = 44.0
+
+[node name="Panel" type="Panel" parent="CanvasLayer/Control"]
+layout_mode = 0
+offset_left = 353.0
+offset_top = 1031.0
+offset_right = 851.0
+offset_bottom = 1071.0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/Control/Panel"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Play" type="Button" parent="CanvasLayer/Control/Panel/HBoxContainer"]
+layout_mode = 2
+text = "▶ Play"
+
+[node name="Pause" type="Button" parent="CanvasLayer/Control/Panel/HBoxContainer"]
+layout_mode = 2
+text = "⏸ Pause"
+
+[node name="CheckButton" type="CheckButton" parent="CanvasLayer/Control/Panel/HBoxContainer"]
+layout_mode = 2
+text = "Loop"
+
+[node name="Label" type="Label" parent="CanvasLayer/Control/Panel/HBoxContainer"]
+layout_mode = 2
+text = "Playback Speed"
+
+[node name="SpinBox" type="SpinBox" parent="CanvasLayer/Control/Panel/HBoxContainer"]
+layout_mode = 2

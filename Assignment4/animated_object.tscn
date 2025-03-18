@@ -64,12 +64,6 @@ visible = false
 mesh = ExtResource("4_3bg8t")
 skeleton = NodePath("../..")
 
-[node name="Dagger" type="MeshInstance3D" parent="Object"]
-transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
-visible = false
-mesh = ExtResource("5_oihr5")
-skeleton = NodePath("../..")
-
 [node name="Ice Staff" type="MeshInstance3D" parent="Object"]
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 visible = false
@@ -134,16 +128,19 @@ offset_right = 40.0
 offset_bottom = 40.0
 
 [node name="Mat Panel" type="Panel" parent="UI/Control"]
+layout_mode = 0
 offset_right = 319.0
 offset_bottom = 321.0
 
 [node name="PRS Panel" type="Panel" parent="UI/Control"]
+layout_mode = 0
 offset_left = 5.0
 offset_top = 347.0
 offset_right = 315.0
 offset_bottom = 635.0
 
 [node name="Mesh Selector" type="Panel" parent="UI/Control"]
+layout_mode = 0
 offset_left = 7.0
 offset_top = 659.0
 offset_right = 315.0
@@ -157,7 +154,14 @@ anchor_bottom = 0.314
 offset_left = 809.0
 offset_top = 9.0
 offset_right = 1150.96
-offset_bottom = 287.44
+offset_bottom = 636.44
+
+[node name="Bonus Toggles" type="Panel" parent="UI/Control"]
+layout_mode = 0
+offset_left = 818.0
+offset_top = 670.0
+offset_right = 1155.0
+offset_bottom = 827.0
 
 [node name="Swap Particle" type="GPUParticles3D" parent="."]
 emitting = false

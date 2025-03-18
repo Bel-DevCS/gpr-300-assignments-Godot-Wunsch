@@ -221,7 +221,7 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
     CreateScaleControl(scaleControls, "Y", 1);
     CreateScaleControl(scaleControls, "Z", 2);
 
-    // 🔹 Add Reset Buttons
+    // Add Reset Buttons
     Button resetPositionButton = new Button { Text = "Reset Position", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
     resetPositionButton.Pressed += ResetPosition;
     prsContainer.AddChild(resetPositionButton);
@@ -247,7 +247,7 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
         };
         controlRow.AddChild(axisLabel);
 
-        // 🔹 Slider for Position
+        // Slider for Position
         HSlider positionSlider = new HSlider
         {
             MinValue = -100.0,  // Min position
@@ -304,7 +304,7 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
         };
         controlRow.AddChild(axisLabel);
 
-        // 🔹 Slider for Rotation
+        // Slider for Rotation
         HSlider rotationSlider = new HSlider
         {
             MinValue = -180.0,  // Min rotation
@@ -328,7 +328,7 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
             valueLabel.Text = rotationSlider.Value.ToString("F1");
         }
 
-        // 🔹 Update rotation dynamically
+        // Update rotation dynamically
         rotationSlider.ValueChanged += (double newValue) =>
         {
             if (ObjectNode is A4_ObjectSwitcher objSwitcher)
@@ -360,7 +360,7 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
         };
         controlRow.AddChild(axisLabel);
 
-        // 🔹 Slider for Scale
+        // Slider for Scale
         HSlider scaleSlider = new HSlider
         {
             MinValue = 0.1,  // Min scale
@@ -384,7 +384,7 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
             valueLabel.Text = scaleSlider.Value.ToString("F1");
         }
 
-        // 🔹 Update scale dynamically
+        // Update scale dynamically
         scaleSlider.ValueChanged += (double newValue) =>
         {
             if (ObjectNode is A4_ObjectSwitcher objSwitcher)
@@ -531,8 +531,52 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
         // 🔹 Add UI elements to MeshSelectorPanel
         MeshSelectorPanel.AddChild(selectorContainer);
     }
+    
+    private void InitEasingDropdown()
+    {
+        if (KeyframePanel == null)
+        {
+            GD.PrintErr("KeyframePanel is not assigned!");
+            return;
+        }
 
-   void InitKeyframeUIPanel()
+        VBoxContainer easingContainer = new VBoxContainer();
+        easingContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        easingContainer.AddThemeConstantOverride("separation", 10);
+
+        Label easingLabel = new Label
+        {
+            Text = "Easing Mode:",
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+        easingContainer.AddChild(easingLabel);
+
+        // 🔹 Create Dropdown (OptionButton)
+        OptionButton easingDropdown = new OptionButton
+        {
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+        };
+
+        // Populate Dropdown
+        easingDropdown.AddItem("Linear", 0);
+        easingDropdown.AddItem("Ease In", 1);
+        easingDropdown.AddItem("Ease Out", 2);
+        easingDropdown.AddItem("Smooth Step", 3);
+
+        // Ensure dropdown reflects current easing mode
+        easingDropdown.Selected = animatedObject.GetEasingType();
+
+        easingDropdown.ItemSelected += (long index) =>
+        {
+            animatedObject.SetEasingType((int)index);
+            GD.Print($"Easing Type Changed: {index}");
+        };
+
+        easingContainer.AddChild(easingDropdown);
+        KeyframePanel.AddChild(easingContainer);
+    }
+
+void InitKeyframeUIPanel()
 {
     if (KeyframePanel == null)
     {
@@ -566,30 +610,12 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
     };
     keyframeButtonRow.AddChild(addKeyframeButton);
 
-    // 🔹 Play Button
-    Button playButton = new Button { Text = "▶ Play", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-    playButton.Pressed += () =>
-    {
-        animatedObject.PlayAnimation();
-        UpdatePlayPauseUI(true);
-    };
-    keyframeButtonRow.AddChild(playButton);
-
-    // 🔹 Pause Button
-    Button pauseButton = new Button { Text = "⏸ Pause", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-    pauseButton.Pressed += () =>
-    {
-        animatedObject.PauseAnimation();
-        UpdatePlayPauseUI(false);
-    };
-    keyframeButtonRow.AddChild(pauseButton);
-
     keyframeContainer.AddChild(keyframeButtonRow);
 
-    // 🔹 Debug Time Controls (Slider + SpinBox)
+    // 🔹 Time Controls (Slider + SpinBox)
     Label timeLabel = new Label
     {
-        Text = "Debug Time (s):",
+        Text = "Animation Time (s):",
         SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
     };
     keyframeContainer.AddChild(timeLabel);
@@ -597,15 +623,15 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
     HBoxContainer timeControlRow = new HBoxContainer();
     timeControlRow.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
 
-    timeSlider = new HSlider
+    HSlider timeSlider = new HSlider
     {
         MinValue = 0,
-        MaxValue = 10,
+        MaxValue = 10, 
         Step = 0.01,
         SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
     };
 
-    timeSpinBox = new SpinBox
+    SpinBox timeSpinBox = new SpinBox
     {
         MinValue = 0,
         MaxValue = 10,
@@ -615,33 +641,50 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
 
     timeSlider.ValueChanged += (double newValue) =>
     {
-        if (isUpdatingTime) return;
-        isUpdatingTime = true;
-
         timeSpinBox.Value = newValue;
-        animatedObject.SetTime((float)newValue);  
-        animatedObject.SetToCurrentKeyframe(); 
-
+        animatedObject.SetTime((float)newValue);
+        animatedObject.SetToCurrentKeyframe();
         UpdateKeyframeInfo();
-        isUpdatingTime = false;
     };
 
     timeSpinBox.ValueChanged += (double newValue) =>
     {
-        if (isUpdatingTime) return;
-        isUpdatingTime = true;
-
         timeSlider.Value = newValue;
-        animatedObject.SetTime((float)newValue);  
-        animatedObject.SetToCurrentKeyframe(); 
-
+        animatedObject.SetTime((float)newValue);
+        animatedObject.SetToCurrentKeyframe();
         UpdateKeyframeInfo();
-        isUpdatingTime = false;
     };
 
     timeControlRow.AddChild(timeSlider);
     timeControlRow.AddChild(timeSpinBox);
     keyframeContainer.AddChild(timeControlRow);
+
+    // 🔹 Easing Mode Dropdown
+    Label easingLabel = new Label
+    {
+        Text = "Easing Mode:",
+        SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+    };
+    keyframeContainer.AddChild(easingLabel);
+
+    OptionButton easingDropdown = new OptionButton
+    {
+        SizeFlagsHorizontal = Control.SizeFlags.ExpandFill
+    };
+
+    easingDropdown.AddItem("Linear", 0);
+    easingDropdown.AddItem("Ease In", 1);
+    easingDropdown.AddItem("Ease Out", 2);
+    easingDropdown.AddItem("Smooth Step", 3);
+
+    easingDropdown.Selected = animatedObject.GetEasingType();
+    easingDropdown.ItemSelected += (long index) =>
+    {
+        animatedObject.SetEasingType((int)index);
+        GD.Print($"Easing Type Changed: {index}");
+    };
+
+    keyframeContainer.AddChild(easingDropdown);
 
     // 🔹 Keyframe List
     keyframeListContainer = new VBoxContainer();
@@ -673,15 +716,9 @@ public partial class A4_AnimatedObjectUI : CanvasLayer
 
     KeyframePanel.AddChild(keyframeContainer);
 
-    // 🔹 Update UI initially
+    // Update UI initially
     UpdateKeyframeList();
-    UpdateTimeControls();
-    UpdatePlayPauseUI(animatedObject.IsPlaying()); // Ensure Play/Pause state updates on startup
 }
-
-
-
-
 
 private void OnEasingTypeChanged(long index)
 {
@@ -802,14 +839,9 @@ void UpdatePlayPauseUI(bool isPlaying)
     }
 }
 
-
-
-
-
-
-
-
-
-
+void initFunToggles()
+{
+    
+}
 
 }

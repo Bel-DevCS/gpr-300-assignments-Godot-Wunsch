@@ -21,7 +21,7 @@ public partial class A4_ObjectSwitcher : Node
             if (child is MeshInstance3D meshInstance)
             {
                 models.Add(meshInstance);
-                EnsureUniqueMaterials(meshInstance); // ✅ Make materials unique
+                EnsureUniqueMaterials(meshInstance); // Make materials unique
                 StoreOriginalMaterialColors(meshInstance);
             }
         }
@@ -29,23 +29,29 @@ public partial class A4_ObjectSwitcher : Node
         SetModel(0);
     }
 
-    /// 🔹 **Ensures each object has a unique instance of its materials**
+    /// **Ensures each object has a unique instance of its materials**
     private void EnsureUniqueMaterials(MeshInstance3D model)
     {
-        int surfaceCount = model.Mesh?.GetSurfaceCount() ?? 0;
+        if (model.Mesh == null) return;
+
+        int surfaceCount = model.Mesh.GetSurfaceCount();
 
         for (int i = 0; i < surfaceCount; i++)
         {
+            // Get the original material (fallback if override is missing)
             Material originalMaterial = model.GetSurfaceOverrideMaterial(i) ?? model.Mesh.SurfaceGetMaterial(i);
 
             if (originalMaterial == null) continue;
 
-            // ✅ Always create a unique material, even if local to scene
-            Material newMaterial = originalMaterial.Duplicate() as Material;
-            newMaterial.ResourceLocalToScene = true; // ✅ Force it to be unique per object
+            // Ensure deep copy of the material
+            Material newMaterial = originalMaterial.Duplicate(true) as Material;
+            if (newMaterial == null) continue;
+
+            newMaterial.ResourceLocalToScene = true; // Force it to be unique per object
             model.SetSurfaceOverrideMaterial(i, newMaterial);
         }
     }
+
 
 
     private void StoreOriginalMaterialColors(MeshInstance3D model)
@@ -85,8 +91,9 @@ public partial class A4_ObjectSwitcher : Node
         models[index].Visible = true;
         currentModelIndex = index;
 
-        EnsureUniqueMaterials(models[index]); // ✅ Ensure materials are unique on switch
-        ApplyMaterialColors(models[index]);
+        // 🔹 Make sure new model has unique materials
+        EnsureUniqueMaterials(models[index]);  
+        ApplyMaterialColors(models[index]);  
 
         ModelChanged?.Invoke();
     }
