@@ -1,0 +1,25 @@
+[gd_scene load_steps=4 format=3 uid="uid://ckwqhwgtqsniw"]
+
+[ext_resource type="Script" uid="uid://cpm1x4cct7bd5" path="res://Assignment5/Code/A5_Testing.cs" id="1_i55ym"]
+[ext_resource type="Script" uid="uid://1fxdgywiqdnh" path="res://Assignment5/Code/A5_CameraController.cs" id="2_wr2vt"]
+
+[sub_resource type="Curve3D" id="Curve3D_hxys4"]
+
+[node name="Node3D" type="Node3D" node_paths=PackedStringArray("_path", "_meshInstance", "_sphereHolder")]
+script = ExtResource("1_i55ym")
+_path = NodePath("Path3D")
+_meshInstance = NodePath("Path3D/MeshInstance3D")
+_sphereHolder = NodePath("Sphere Holder")
+
+[node name="Path3D" type="Path3D" parent="."]
+curve = SubResource("Curve3D_hxys4")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Path3D"]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+script = ExtResource("2_wr2vt")
+
+[node name="Sphere Holder" type="Node3D" parent="."]
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.71172, 0.702464, 0, -0.702464, 0.71172, 0, 0.776108, 0)
