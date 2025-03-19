@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using Gizmo3DPlugin;
 using Godot.Collections;
 using Godot.NativeInterop;
 
@@ -19,8 +20,13 @@ public partial class A5_Testing : Node
     private float _speed = 0.1f;
     
     private Dictionary<int, MeshInstance3D> _spheres = new();
+    private int _selectedSphereIndex = -1;
+
+    private Gizmo3D _gizmo = new();
     
     private bool _isPaused = false;
+
+    private bool _isInit = false;
 
     public override void _Ready()
     {
@@ -29,34 +35,16 @@ public partial class A5_Testing : Node
             GD.PrintErr("Path3D node is not assigned!");
             return;
         }
-        
-        _curve.BakeInterval = 0.05f; 
 
-        // Adding points correctly
-        AddCurvePoint(new Vector3(0, 0, 0), new Vector3(-0.5f, 0, -0.5f), new Vector3(0.5f, 0, 0.5f));
-        AddCurvePoint(new Vector3(0, 0, 1), new Vector3(-0.5f, 0, -0.5f), new Vector3(0.5f, 0, 0.5f));
-        AddCurvePoint(new Vector3(1, 0, 2), new Vector3(-0.5f, 0, -0.5f), new Vector3(0.5f, 0, 0.5f));
-        AddCurvePoint(new Vector3(1, 0, 1), new Vector3(-0.5f, 0, -0.5f), new Vector3(0.5f, 0, 0.5f));
-        AddCurvePoint(new Vector3(1, 0, 0), new Vector3(-0.5f, 0, -0.5f), new Vector3(0.5f, 0, 0.5f));
-
-        // Close the curve by adding the first point at the end
-        Vector3 firstPos = _curve.GetPointPosition(0);
-        Vector3 firstIn = _curve.GetPointIn(0);
-        Vector3 firstOut = _curve.GetPointOut(0);
-        AddCurvePoint(firstPos, firstOut, firstIn); 
-
-        // Assigning the curve to the path
-        _path.Curve = _curve;
-        _path.Visible = true;
-        
-        
-        for (int i = 0; i < _curve.PointCount; i++)
-        {
-            Vector3 point = _curve.GetPointPosition(i);
-            AddSphereAtPoint(i, _curve.GetPointPosition(i), _sphereHolder);
-        }
-
+        ResetCurve();
         AddMovingObject();
+        _isInit = true;
+
+        _gizmo = new Gizmo3D();
+        AddChild(_gizmo);
+        _gizmo.Mode = Gizmo3D.ToolMode.Move;
+        
+        _gizmo.Select(_path);
     }
     
     private void AddSphereAtPoint(int index, Vector3 position, Node3D parent)
@@ -71,12 +59,25 @@ public partial class A5_Testing : Node
 
         StandardMaterial3D sphereMat = new StandardMaterial3D();
         sphereMat.AlbedoColor = Colors.DarkRed;
-        
         sphere.MaterialOverride = sphereMat;
+
+        // Add collision shape so the sphere can be clicked
+        StaticBody3D body = new StaticBody3D();
+        CollisionShape3D collider = new CollisionShape3D();
+        SphereShape3D sphereShape = new SphereShape3D
+        {
+            Radius = 0.1f
+        };
+
+        collider.Shape = sphereShape;
+        body.AddChild(collider);
+        body.Position = Vector3.Zero; // Keep collision centered in the sphere
+        sphere.AddChild(body);
+
         parent.AddChild(sphere);
-        
         _spheres[index] = sphere;
     }
+
     
     private void AddCurvePoint(Vector3 position, Vector3 inHandle, Vector3 outHandle)
     {
@@ -145,6 +146,7 @@ public partial class A5_Testing : Node
             }
         }
 
+
         
         DrawCurve();
     }
@@ -156,7 +158,15 @@ public partial class A5_Testing : Node
     
     public void ResetCurve()
     {
-        GD.Print("Resetting Curve...");
+        if (!_isInit)
+        {
+            GD.Print("Setting Curve");
+        }
+        else
+        {
+            GD.Print("Resetting Curve...");
+        }
+       
 
         // Clear existing curve
         _curve.ClearPoints();
@@ -194,4 +204,69 @@ public partial class A5_Testing : Node
         DrawCurve();
         GD.Print("Curve Reset!");
     }
+    
+    
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event is InputEventMouseButton mouseEvent && mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Left)
+        {
+            // Perform a raycast from the camera
+            Camera3D camera = GetViewport().GetCamera3D();
+            if (camera == null) return;
+
+            Vector3 rayOrigin = camera.ProjectRayOrigin(mouseEvent.Position);
+            Vector3 rayDirection = camera.ProjectRayNormal(mouseEvent.Position) * 1000f;
+
+            var spaceState = GetViewport().GetWorld3D().DirectSpaceState;
+            var query = PhysicsRayQueryParameters3D.Create(rayOrigin, rayOrigin + rayDirection);
+            var result = spaceState.IntersectRay(query);
+
+            // FIX: Use .Obj to safely cast from Variant to StaticBody3D
+            if (result.Count > 0 && result["collider"].Obj is StaticBody3D collider)
+            {
+                // Find which sphere was clicked
+                foreach (var kvp in _spheres)
+                {
+                    if (kvp.Value.GetChild(0) == collider)  // The first child of MeshInstance3D is the StaticBody3D
+                    {
+                        _selectedSphereIndex = kvp.Key;
+                        UpdateSphereColors();
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+
+    
+    private void UpdateSphereColors()
+    {
+        foreach (var kvp in _spheres)
+        {
+            var sphere = kvp.Value;
+            if (sphere == null) continue;
+
+            var material = sphere.MaterialOverride as StandardMaterial3D;
+            if (material == null) continue;
+
+            material.AlbedoColor = (kvp.Key == _selectedSphereIndex) ? Colors.Green : Colors.DarkRed;
+        }
+    }
+
+
+
+    
+    
+    public override void _ExitTree()
+    {
+        if (_gizmo != null && IsInstanceValid(_gizmo))
+        {
+            _gizmo.Deselect(_path);
+            RemoveChild(_gizmo);
+            _gizmo.QueueFree();
+            _gizmo = null;
+        }
+    }
+
 }
