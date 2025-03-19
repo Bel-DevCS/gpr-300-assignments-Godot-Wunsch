@@ -14,7 +14,7 @@ public partial class A5_Testing : Node
     [Export] private Node3D _sphereHolder;
     
     private PathFollow3D _pathFollow;
-    private MeshInstance3D _cube;
+    private CsgBox3D _cube;
     
     private float _progress = 0f;
     private float _speed = 0.1f;
@@ -113,83 +113,145 @@ public partial class A5_Testing : Node
 
     private void AddMovingObject()
     {
-        _cube = new MeshInstance3D();
-        _cube.Mesh = new BoxMesh()
-        {
-            Size = new Vector3(0.2f, 0.2f, 0.2f)
-        };
-        
+        // Create the cube body
+        var cube = new CsgBox3D();
+        cube.Size = new Vector3(0.2f, 0.2f, 0.2f);
+
         StandardMaterial3D cubeMat = new StandardMaterial3D();
         cubeMat.AlbedoColor = Colors.Cyan;
-        
-        _cube.MaterialOverride = cubeMat;
-        
+        cube.Material = cubeMat;
+
+        // Create the left eye (CSG Sphere)
+        var leftEye = new CsgSphere3D();
+        leftEye.Radius = 0.04f;
+        leftEye.Position = new Vector3(-0.05f, 0.05f, 0.11f); 
+
+        StandardMaterial3D scleraMat = new StandardMaterial3D();
+        scleraMat.AlbedoColor = Colors.White;
+        leftEye.Material = scleraMat;
+
+        // Create left pupil (MeshInstance3D instead of CSG)
+        var leftPupil = new MeshInstance3D();
+        leftPupil.Mesh = new SphereMesh()
+        {
+            Radius = 0.02f, // Smaller than sclera
+            Height = 0.04f
+        };
+        leftPupil.Position = new Vector3(0, 0, 0.025f); // Move slightly forward inside eye
+
+        StandardMaterial3D pupilMat = new StandardMaterial3D();
+        pupilMat.AlbedoColor = Colors.Black;
+        leftPupil.MaterialOverride = pupilMat;
+
+        // Parent pupil to eye
+        leftEye.AddChild(leftPupil);
+
+        // Create the right eye (Duplicate left eye)
+        var rightEye = new CsgSphere3D();
+        rightEye.Radius = 0.04f;
+        rightEye.Position = new Vector3(0.05f, 0.05f, 0.11f);
+        rightEye.Material = scleraMat;
+
+        // Create right pupil (Another MeshInstance3D)
+        var rightPupil = new MeshInstance3D();
+        rightPupil.Mesh = new SphereMesh()
+        {
+            Radius = 0.02f,
+            Height = 0.04f
+        };
+        rightPupil.Position = new Vector3(0, 0, 0.025f);
+        rightPupil.MaterialOverride = pupilMat;
+
+        // Parent pupil to right eye
+        rightEye.AddChild(rightPupil);
+
+        // Parent eyes to cube
+        cube.AddChild(leftEye);
+        cube.AddChild(rightEye);
+
+        // Assign to class variable for movement
+        _cube = cube;
         AddChild(_cube);
     }
+
+
+
+
     
-    public override void _Process(double delta)
+   public override void _Process(double delta)
+{
+    if (_curve == null || _cube == null || _curve.PointCount == 0)
+        return;
+
+    _progress += (float)delta * _speed;
+    if (_progress > 1f)
+        _progress = 0f;
+
+    float curveLength = _curve.GetBakedLength();
+
+    // Sample the current position
+    Vector3 newPos = _curve.SampleBaked(_progress * curveLength, true);
+    _cube.Position = newPos;
+
+    // Sample a slightly ahead position to get movement direction
+    float aheadProgress = _progress + 0.01f; // Small offset forward
+    if (aheadProgress > 1f) aheadProgress = 0f; // Loop around if at the end
+
+    Vector3 nextPos = _curve.SampleBaked(aheadProgress * curveLength, true);
+    Vector3 direction = (nextPos - newPos).Normalized();
+
+    if (direction.Length() > 0.01f) // Avoid division errors if too small
     {
-        if (_curve == null || _cube == null || _curve.PointCount == 0)
-            return;
-
-        _progress += (float)delta * _speed;
-
-        if (_progress > 1f)
-            _progress = 0f;
-
-        // Ensure we do not attempt to sample an empty curve
-        if (_curve.PointCount > 0)
-        {
-            Vector3 newPos = _curve.SampleBaked(_progress * _curve.GetBakedLength(), true);
-            _cube.Position = newPos;
-        }
-
-        // Sync sphere positions with curve points
-        for (int i = 0; i < _curve.PointCount; i++)
-        {
-            if (_spheres.TryGetValue(i, out MeshInstance3D sphere))
-            {
-                if (!_lastSpherePositions.ContainsKey(i)) continue; // Avoid missing entries
-            
-                Vector3 newSpherePos = _curve.GetPointPosition(i);
-                if (_lastSpherePositions[i] != newSpherePos)
-                {
-                    sphere.Position = newSpherePos;
-                    _lastSpherePositions[i] = newSpherePos;
-                }
-            }
-        }
-
-        // Ensure only valid spheres are checked for movement
-        List<int> toRemove = new List<int>();
-        foreach (var kvp in _spheres)
-        {
-            int index = kvp.Key;
-            MeshInstance3D sphere = kvp.Value;
-
-            // Check if the curve still has this index
-            if (index >= _curve.PointCount)
-            {
-                toRemove.Add(index);
-                continue;
-            }
-
-            if (_lastSpherePositions.ContainsKey(index) && _lastSpherePositions[index] != sphere.Position)
-            {
-                _curve.SetPointPosition(index, sphere.Position);
-                _lastSpherePositions[index] = sphere.Position;
-            }
-        }
-
-        // Remove any spheres that are no longer valid
-        foreach (int index in toRemove)
-        {
-            _spheres.Remove(index);
-            _lastSpherePositions.Remove(index);
-        }
-
-        DrawCurve();
+        _cube.LookAt(newPos - direction, Vector3.Up);
     }
+
+    // **Ensure sphere positions sync with the curve**
+    for (int i = 0; i < _curve.PointCount; i++)
+    {
+        if (_spheres.TryGetValue(i, out MeshInstance3D sphere))
+        {
+            Vector3 newSpherePos = _curve.GetPointPosition(i);
+            if (_lastSpherePositions.ContainsKey(i) && _lastSpherePositions[i] != newSpherePos)
+            {
+                sphere.Position = newSpherePos;
+                _lastSpherePositions[i] = newSpherePos;
+            }
+        }
+    }
+
+    // **Ensure we update the curve if spheres move**
+    List<int> toRemove = new List<int>();
+    foreach (var kvp in _spheres)
+    {
+        int index = kvp.Key;
+        MeshInstance3D sphere = kvp.Value;
+
+        // Remove spheres that no longer exist
+        if (index >= _curve.PointCount)
+        {
+            toRemove.Add(index);
+            continue;
+        }
+
+        if (_lastSpherePositions.ContainsKey(index) && _lastSpherePositions[index] != sphere.Position)
+        {
+            _curve.SetPointPosition(index, sphere.Position);
+            _lastSpherePositions[index] = sphere.Position;
+        }
+    }
+
+    // Remove invalid spheres
+    foreach (int index in toRemove)
+    {
+        _spheres.Remove(index);
+        _lastSpherePositions.Remove(index);
+    }
+
+    DrawCurve();
+}
+
+
+
 
     public void TogglePause()
     {
