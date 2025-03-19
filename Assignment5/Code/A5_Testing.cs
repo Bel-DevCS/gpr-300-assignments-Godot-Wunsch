@@ -21,6 +21,8 @@ public partial class A5_Testing : Node
     
     private Godot.Collections.Dictionary<int, MeshInstance3D> _spheres = new();
     private Godot.Collections.Dictionary<int, Vector3> _lastSpherePositions = new();
+    private Godot.Collections.Dictionary<int, Vector3> _originalInHandles = new();
+    private Godot.Collections.Dictionary<int, Vector3> _originalOutHandles = new();
     
     private int _selectedSphereIndex = -1;
 
@@ -88,6 +90,10 @@ public partial class A5_Testing : Node
         int index = _curve.PointCount - 1;
         _curve.SetPointIn(index, inHandle);
         _curve.SetPointOut(index, outHandle);
+
+       
+        _originalInHandles[index] = inHandle;
+        _originalOutHandles[index] = outHandle;
     }
     
     private void DrawCurve()
@@ -178,77 +184,44 @@ public partial class A5_Testing : Node
 
 
     
-   public override void _Process(double delta)
-{
-    if (_curve == null || _cube == null || _curve.PointCount == 0)
-        return;
-
-    _progress += (float)delta * _speed;
-    if (_progress > 1f)
-        _progress = 0f;
-
-    float curveLength = _curve.GetBakedLength();
-
-    // Sample the current position
-    Vector3 newPos = _curve.SampleBaked(_progress * curveLength, true);
-    _cube.Position = newPos;
-
-    // Sample a slightly ahead position to get movement direction
-    float aheadProgress = _progress + 0.01f; // Small offset forward
-    if (aheadProgress > 1f) aheadProgress = 0f; // Loop around if at the end
-
-    Vector3 nextPos = _curve.SampleBaked(aheadProgress * curveLength, true);
-    Vector3 direction = (nextPos - newPos).Normalized();
-
-    if (direction.Length() > 0.01f) // Avoid division errors if too small
+    public override void _Process(double delta)
     {
-        _cube.LookAt(newPos - direction, Vector3.Up);
-    }
+        if (_curve == null || _cube == null || _curve.PointCount == 0)
+            return;
+        
+        SyncCurveWithSpheres();
 
-    // **Ensure sphere positions sync with the curve**
-    for (int i = 0; i < _curve.PointCount; i++)
-    {
-        if (_spheres.TryGetValue(i, out MeshInstance3D sphere))
+        _progress += (float)delta * _speed;
+        if (_progress > 1f)
+            _progress = 0f;
+
+        float curveLength = _curve.GetBakedLength();
+
+        // Sample position and ahead position for direction
+        Vector3 newPos = _curve.SampleBaked(_progress * curveLength, true);
+        float aheadProgress = _progress + 0.01f;
+        if (aheadProgress > 1f) aheadProgress = 0f;
+
+        Vector3 nextPos = _curve.SampleBaked(aheadProgress * curveLength, true);
+        Vector3 direction = (nextPos - newPos).Normalized();
+
+        // **🐣 Add a gentle bounce!**
+        float bounceHeight = 0.02f; // Small hop
+        float bounceSpeed = 4f; // How fast Dirpy bounces
+        float bounceOffset = Mathf.Sin(_progress * Mathf.Pi * 2 * bounceSpeed) * bounceHeight;
+
+        // Apply new position with bounce
+        _cube.Position = new Vector3(newPos.X, newPos.Y + bounceOffset, newPos.Z);
+
+        // **🐥 Make Dirpy face forward**
+        if (direction.Length() > 0.01f) 
         {
-            Vector3 newSpherePos = _curve.GetPointPosition(i);
-            if (_lastSpherePositions.ContainsKey(i) && _lastSpherePositions[i] != newSpherePos)
-            {
-                sphere.Position = newSpherePos;
-                _lastSpherePositions[i] = newSpherePos;
-            }
-        }
-    }
-
-    // **Ensure we update the curve if spheres move**
-    List<int> toRemove = new List<int>();
-    foreach (var kvp in _spheres)
-    {
-        int index = kvp.Key;
-        MeshInstance3D sphere = kvp.Value;
-
-        // Remove spheres that no longer exist
-        if (index >= _curve.PointCount)
-        {
-            toRemove.Add(index);
-            continue;
+            _cube.LookAt(newPos - direction, Vector3.Up);
         }
 
-        if (_lastSpherePositions.ContainsKey(index) && _lastSpherePositions[index] != sphere.Position)
-        {
-            _curve.SetPointPosition(index, sphere.Position);
-            _lastSpherePositions[index] = sphere.Position;
-        }
+        DrawCurve();
     }
 
-    // Remove invalid spheres
-    foreach (int index in toRemove)
-    {
-        _spheres.Remove(index);
-        _lastSpherePositions.Remove(index);
-    }
-
-    DrawCurve();
-}
 
 
 
@@ -327,8 +300,24 @@ public partial class A5_Testing : Node
                 RemovePoint(_selectedSphereIndex);
                 _selectedSphereIndex = -1; // Reset selection
             }
+            else if (keyEvent.Keycode == Key.Key1) // Toggle to Move Mode
+            {
+                _gizmo.Mode = Gizmo3D.ToolMode.Move;
+                GD.Print("Gizmo Mode: Move");
+            }
+            else if (keyEvent.Keycode == Key.Key2) // Toggle to Scale Mode
+            {
+                _gizmo.Mode = Gizmo3D.ToolMode.Scale;
+                GD.Print("Gizmo Mode: Scale");
+            }
+            else if (keyEvent.Keycode == Key.Key3) // Toggle to Rotate Mode
+            {
+                _gizmo.Mode = Gizmo3D.ToolMode.Rotate;
+                GD.Print("Gizmo Mode: Rotate");
+            }
         }
     }
+
     
     private void HandleSphereSelection(Vector2 mousePosition)
     {
@@ -493,6 +482,55 @@ public partial class A5_Testing : Node
         }
     }
     
+    
+    private void SyncCurveWithSpheres()
+    {
+        foreach (var kvp in _spheres)
+        {
+            int index = kvp.Key;
+            MeshInstance3D sphere = kvp.Value;
+
+            if (index >= _curve.PointCount) continue; // Skip invalid points
+
+            // 🔹 Position Syncing (Already Works)
+            Vector3 newSpherePos = sphere.GlobalTransform.Origin;
+            if (_lastSpherePositions.ContainsKey(index) && _lastSpherePositions[index] != newSpherePos)
+            {
+                _curve.SetPointPosition(index, newSpherePos);
+                _lastSpherePositions[index] = newSpherePos;
+            }
+
+            // 🔹 Scale Syncing
+            Vector3 sphereScale = sphere.Scale;
+            if (!_originalInHandles.ContainsKey(index) || !_originalOutHandles.ContainsKey(index))
+                continue;
+
+            Vector3 scaledInHandle = _originalInHandles[index] * sphereScale;
+            Vector3 scaledOutHandle = _originalOutHandles[index] * sphereScale;
+
+            _curve.SetPointIn(index, scaledInHandle);
+            _curve.SetPointOut(index, scaledOutHandle);
+
+            // 🔹 Rotation Syncing (Only update when needed)
+            Quaternion sphereRotation = sphere.GlobalTransform.Basis.GetRotationQuaternion();
+            Vector3 lastRotation = _lastSpherePositions.ContainsKey(index) ? _lastSpherePositions[index] : Vector3.Zero;
+            Vector3 newRotation = sphereRotation.GetEuler();
+
+            if (!lastRotation.IsEqualApprox(newRotation)) // Only update when actually rotated
+            {
+                Basis rotatedBasis = new Basis(sphereRotation);
+
+                Vector3 rotatedInHandle = rotatedBasis * _originalInHandles[index];
+                Vector3 rotatedOutHandle = rotatedBasis * _originalOutHandles[index];
+
+                _curve.SetPointIn(index, rotatedInHandle);
+                _curve.SetPointOut(index, rotatedOutHandle);
+
+                _lastSpherePositions[index] = newRotation;
+            }
+        }
+    }
+
     
     public override void _ExitTree()
     {
