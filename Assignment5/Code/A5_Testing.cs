@@ -108,64 +108,68 @@ public partial class A5_Testing : Node
     }
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event is InputEventMouseButton mouseEvent)
+        if (!RuntimeConsole.IsTyping)
         {
-            if (mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Left)
+            if (@event is InputEventMouseButton mouseEvent)
             {
-                HandleSphereSelection(mouseEvent.Position);
+                if (mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Left)
+                {
+                    HandleSphereSelection(mouseEvent.Position);
+                }
+            }
+            else if (@event is InputEventKey keyEvent && keyEvent.Pressed)
+            {
+                switch (keyEvent.Keycode)
+                {
+                    case Key.Up:
+                        Vector3 newPoint = _spheres.Count > 0
+                            ? _spheres[_spheres.Count - 1].Position + new Vector3(0.5f, 0, 0)
+                            : new Vector3(0, 0, 0);
+                        AddPoint(newPoint);
+                        break;
+
+                    case Key.Down:
+                        if (_selectedSphereIndex != -1)
+                        {
+                            RemovePoint(_selectedSphereIndex);
+                            _selectedSphereIndex = -1;
+                        }
+                        break;
+
+                    case Key.Key1:
+                        _gizmo.Mode = Gizmo3D.ToolMode.Move;
+                        RuntimeConsole.LogMessage("Gizmo Mode : Move");
+                        break;
+
+                    case Key.Key2:
+                        _gizmo.Mode = Gizmo3D.ToolMode.Scale;
+                        RuntimeConsole.LogMessage("Gizmo Mode : Scale");
+                        break;
+
+                    case Key.Key3:
+                        _gizmo.Mode = Gizmo3D.ToolMode.Rotate;
+                        RuntimeConsole.LogMessage("Gizmo Mode : Rotate");
+                        break;
+
+                    case Key.Escape:
+                        DeselectSphere();
+                        break;
+
+                    case Key.Space:
+                        TogglePause();
+                        break;
+
+                    case Key.R:
+                        ResetCurve();
+                        break;
+
+                    case Key.Backslash:
+                        _showDebugUI = !_showDebugUI;
+                        break;
+                }
             }
         }
-        else if (@event is InputEventKey keyEvent && keyEvent.Pressed)
-        {
-            switch (keyEvent.Keycode)
-            {
-                case Key.Up:
-                    Vector3 newPoint = _spheres.Count > 0
-                        ? _spheres[_spheres.Count - 1].Position + new Vector3(0.5f, 0, 0)
-                        : new Vector3(0, 0, 0);
-                    AddPoint(newPoint);
-                    break;
-
-                case Key.Down:
-                    if (_selectedSphereIndex != -1)
-                    {
-                        RemovePoint(_selectedSphereIndex);
-                        _selectedSphereIndex = -1;
-                    }
-                    break;
-
-                case Key.Key1:
-                    _gizmo.Mode = Gizmo3D.ToolMode.Move;
-                    RuntimeConsole.LogMessage("Gizmo Mode : Move");
-                    break;
-
-                case Key.Key2:
-                    _gizmo.Mode = Gizmo3D.ToolMode.Scale;
-                    RuntimeConsole.LogMessage("Gizmo Mode : Scale");
-                    break;
-
-                case Key.Key3:
-                    _gizmo.Mode = Gizmo3D.ToolMode.Rotate;
-                    RuntimeConsole.LogMessage("Gizmo Mode : Rotate");
-                    break;
-
-                case Key.Escape:
-                    DeselectSphere();
-                    break;
-
-                case Key.Space:
-                    TogglePause();
-                    break;
-
-                case Key.R:
-                    ResetCurve();
-                    break;
-
-                case Key.Backslash:
-                    _showDebugUI = !_showDebugUI;
-                    break;
-            }
-        }
+       
     }
 
     public override void _ExitTree()
