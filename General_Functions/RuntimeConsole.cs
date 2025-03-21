@@ -143,7 +143,6 @@ public static class RuntimeConsole
             {
                 case "/endprogram":
                     LogMessage("<Admin> has terminated program.");
-                    // This will exit the app gracefully
                     GetTree()?.Quit();
                     break;
 

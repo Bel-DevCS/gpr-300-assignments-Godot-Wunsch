@@ -633,12 +633,42 @@ public partial class A5_Testing : Node
 
     void DrawImGui()
     {
-        ImGui.Begin("Sphere Info");
-        
-        foreach(var sphere in _spheres)
-            ImGui.Text("Sphere " + sphere.Key.ToString() + " pos : " + sphere.Value.Position.ToString());
+
+        if (ImGui.Begin("Sphere Info"))
+        {
+            foreach(var sphere in _spheres)
+                ImGui.Text("Sphere " + sphere.Key.ToString() + " pos : " + sphere.Value.Position.ToString());
+        }
 
         ImGui.End();
+
+        if (ImGui.Begin("Exposed Variables"))
+        {
+            // Speed Slider
+            ImGui.SliderFloat("Speed", ref _speed, 0f, 2f);
+
+            // Reset Speed Button
+            if (ImGui.Button("Reset Speed"))
+            {
+                _speed = 0.1f;
+                RuntimeConsole.LogMessage("Speed reset to 0.1");
+            }
+
+            // Pause Toggle
+            bool pauseToggle = _isPaused;
+            if (ImGui.Checkbox("Paused", ref pauseToggle) && pauseToggle != _isPaused)
+            {
+                TogglePause();
+            }
+
+            // Bounce Toggle
+            ImGui.Checkbox("Bouncing", ref _isBouncing);
+
+            // Show Debug UI Toggle
+            ImGui.Checkbox("Show Debug UI", ref _showDebugUI);
+        }
+        ImGui.End();
+
         
         RuntimeConsole.Draw();
     }
