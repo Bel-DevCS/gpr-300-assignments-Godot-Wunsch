@@ -39,8 +39,8 @@ public partial class A5_Testing : Node
     {
         if (_path == null)
         {
-            GD.PrintErr("Path3D node is not assigned!");
-            return;
+           RuntimeConsole.LogError("Path is null");
+           return;
         }
 
         _curve.Closed = true;
@@ -136,22 +136,21 @@ public partial class A5_Testing : Node
 
                 case Key.Key1:
                     _gizmo.Mode = Gizmo3D.ToolMode.Move;
-                    GD.Print("Gizmo Mode: Move");
+                    RuntimeConsole.LogMessage("Gizmo Mode : Move");
                     break;
 
                 case Key.Key2:
                     _gizmo.Mode = Gizmo3D.ToolMode.Scale;
-                    GD.Print("Gizmo Mode: Scale");
+                    RuntimeConsole.LogMessage("Gizmo Mode : Scale");
                     break;
 
                 case Key.Key3:
                     _gizmo.Mode = Gizmo3D.ToolMode.Rotate;
-                    GD.Print("Gizmo Mode: Rotate");
+                    RuntimeConsole.LogMessage("Gizmo Mode : Rotate");
                     break;
 
                 case Key.Escape:
                     DeselectSphere();
-                    GD.Print("Deselected sphere.");
                     break;
 
                 case Key.Space:
@@ -178,13 +177,16 @@ public partial class A5_Testing : Node
             _gizmo.QueueFree();
             _gizmo = null;
         }
+        
+        _cube.QueueFree();
+        RuntimeConsole.ClearLog();
     }
     
     //Logic Control Functions
     public void TogglePause()
     {
         _isPaused = !_isPaused;
-        GD.Print(_isPaused ? "Paused" : "Resumed");
+        RuntimeConsole.LogMessage(_isPaused ? "Paused" : "Resumed");
     }
 
     void ToggleUI()
@@ -196,11 +198,11 @@ public partial class A5_Testing : Node
     {
         if (!_isInit)
         {
-            GD.Print("Setting Curve");
+            RuntimeConsole.LogMessage("Setting Curve");
         }
         else
         {
-            GD.Print("Resetting Curve...");
+            RuntimeConsole.LogMessage("Resetting Curve");
         }
 
         // Deselect selected sphere and gizmo
@@ -237,7 +239,7 @@ public partial class A5_Testing : Node
 
         // Force Redraw
         DrawCurve();
-        GD.Print("Curve Reset!");
+        RuntimeConsole.LogMessage("Curve Reset");
     }
     
     //Curve Creation and Rendering
@@ -385,13 +387,14 @@ public partial class A5_Testing : Node
         _originalInHandles[index] = inHandle;
         _originalOutHandles[index] = outHandle;
 
+        RuntimeConsole.LogMessage("Point added at " + position.ToString());
         DrawCurve();
     }
     public void RemovePoint(int index)
     {
         if (index < 0 || index >= _curve.PointCount)
         {
-            GD.PrintErr($"Invalid index {index} for removal.");
+            RuntimeConsole.LogError($"Invalid index {index} for removal.");
             return;
         }
 
@@ -442,7 +445,7 @@ public partial class A5_Testing : Node
         {
             _curve.SetPointPosition(i, _lastSpherePositions[i]);
         }
-
+        RuntimeConsole.LogMessage("Point " + index + " removed");
         DrawCurve();
     }
     private void AddSphereAtPoint(int index, Vector3 position, Node3D parent)
@@ -541,6 +544,9 @@ public partial class A5_Testing : Node
             var material = sphere.MaterialOverride as StandardMaterial3D;
             material.AlbedoColor = Colors.DarkRed;
             _gizmo.Deselect(sphere);
+            
+            if(sphere != null)
+                RuntimeConsole.LogMessage("Deselected Sphere");
         }
         
         _selectedSphereIndex = -1;
@@ -629,5 +635,7 @@ public partial class A5_Testing : Node
             ImGui.Text("Sphere " + sphere.Key.ToString() + " pos : " + sphere.Value.Position.ToString());
 
         ImGui.End();
+        
+        RuntimeConsole.Draw();
     }
 }
