@@ -29,6 +29,7 @@ public partial class A5_Testing : Node
     private Gizmo3D _gizmo = new();
     
     private bool _isPaused = false;
+    private bool _isBouncing = true;
 
     private bool _isInit = false;
 
@@ -96,6 +97,23 @@ public partial class A5_Testing : Node
         _originalOutHandles[index] = outHandle;
     }
     
+    private ShaderMaterial CreateVertexColorMaterial()
+    {
+        Shader shader = new Shader();
+        shader.Code = @"
+        shader_type spatial;
+        render_mode unshaded;
+        
+        void fragment() {
+            ALBEDO = COLOR.rgb;
+        }
+    ";
+
+        ShaderMaterial shaderMat = new ShaderMaterial();
+        shaderMat.Shader = shader;
+
+        return shaderMat;
+    }
     private void DrawCurve()
     {
         ImmediateMesh immediateMesh = new ImmediateMesh();
@@ -103,20 +121,37 @@ public partial class A5_Testing : Node
 
         float length = _curve.GetBakedLength();
         int steps = 300; // Higher value = smoother curve
+
+        // Define distinct colors
+        Color[] colors = { Colors.Green, Colors.Blue, Colors.Yellow, Colors.Red, Colors.Magenta };
+
         for (int i = 0; i < steps; i++)
         {
             float t1 = (i / (float)steps) * length;
             float t2 = ((i + 1) / (float)steps) * length;
+
             Vector3 start = _curve.SampleBaked(t1);
             Vector3 end = _curve.SampleBaked(t2);
+
+            Color segmentColor = colors[i % colors.Length]; // Pick a color based on segment index
+
+            immediateMesh.SurfaceSetColor(segmentColor);
             immediateMesh.SurfaceAddVertex(start);
+
+            immediateMesh.SurfaceSetColor(segmentColor);
             immediateMesh.SurfaceAddVertex(end);
         }
 
         immediateMesh.SurfaceEnd();
+
+        // 🟢 Assign the custom vertex color shader material
+        if (_meshInstance.MaterialOverride == null)
+        {
+            _meshInstance.MaterialOverride = CreateVertexColorMaterial();
+        }
+
         _meshInstance.Mesh = immediateMesh;
     }
-
     private void AddMovingObject()
     {
         // Create the cube body
@@ -205,13 +240,22 @@ public partial class A5_Testing : Node
         Vector3 nextPos = _curve.SampleBaked(aheadProgress * curveLength, true);
         Vector3 direction = (nextPos - newPos).Normalized();
 
-        // **🐣 Add a gentle bounce!**
-        float bounceHeight = 0.02f; // Small hop
+      
+        float bounceHeight = 0.08f; // Small hop
         float bounceSpeed = 4f; // How fast Dirpy bounces
         float bounceOffset = Mathf.Sin(_progress * Mathf.Pi * 2 * bounceSpeed) * bounceHeight;
 
         // Apply new position with bounce
-        _cube.Position = new Vector3(newPos.X, newPos.Y + bounceOffset, newPos.Z);
+        if (_isBouncing)
+        {
+            _cube.Position = new Vector3(newPos.X, newPos.Y + bounceOffset, newPos.Z);
+        }
+
+        else
+        {
+            _cube.Position = new Vector3(newPos.X, newPos.Y, newPos.Z);
+        }
+        
 
         // **🐥 Make Dirpy face forward**
         if (direction.Length() > 0.01f) 
@@ -315,8 +359,14 @@ public partial class A5_Testing : Node
                 _gizmo.Mode = Gizmo3D.ToolMode.Rotate;
                 GD.Print("Gizmo Mode: Rotate");
             }
+            else if (keyEvent.Keycode == Key.Escape) // 🟢 Deselect sphere on Escape key
+            {
+                DeselectSphere();
+                GD.Print("Deselected sphere.");
+            }
         }
     }
+
 
     
     private void HandleSphereSelection(Vector2 mousePosition)
@@ -458,9 +508,11 @@ public partial class A5_Testing : Node
     {
         if (_selectedSphereIndex != -1 && _spheres.TryGetValue(_selectedSphereIndex, out MeshInstance3D sphere))
         {
+            var material = sphere.MaterialOverride as StandardMaterial3D;
+            material.AlbedoColor = Colors.DarkRed;
             _gizmo.Deselect(sphere);
         }
-
+        
         _selectedSphereIndex = -1;
         _gizmo.Deselect(_path);
     }
