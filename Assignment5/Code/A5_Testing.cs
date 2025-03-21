@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using Gizmo3DPlugin;
 using Godot.NativeInterop;
+using ImGuiNET;
+
 public partial class A5_Testing : Node
 {
     //Exported Fields
@@ -30,6 +32,7 @@ public partial class A5_Testing : Node
     private bool _isPaused;
     private bool _isBouncing = true;
     private bool _isInit;
+    private bool _showDebugUI;
 
     //Lifecycle Functions
     public override void _Ready()
@@ -98,6 +101,10 @@ public partial class A5_Testing : Node
         }
 
         DrawCurve();
+        
+        if(_showDebugUI)
+            DrawImGui();
+       
     }
     public override void _UnhandledInput(InputEvent @event)
     {
@@ -110,51 +117,58 @@ public partial class A5_Testing : Node
         }
         else if (@event is InputEventKey keyEvent && keyEvent.Pressed)
         {
-            if (keyEvent.Keycode == Key.Up) // Add point at the last sphere position + offset
+            switch (keyEvent.Keycode)
             {
-                Vector3 newPoint = _spheres.Count > 0
-                    ? _spheres[_spheres.Count - 1].Position + new Vector3(0.5f, 0, 0)
-                    : new Vector3(0, 0, 0); // Default starting point
+                case Key.Up:
+                    Vector3 newPoint = _spheres.Count > 0
+                        ? _spheres[_spheres.Count - 1].Position + new Vector3(0.5f, 0, 0)
+                        : new Vector3(0, 0, 0);
+                    AddPoint(newPoint);
+                    break;
 
-                AddPoint(newPoint);
-            }
-            else if (keyEvent.Keycode == Key.Down && _selectedSphereIndex != -1) // Remove selected point
-            {
-                RemovePoint(_selectedSphereIndex);
-                _selectedSphereIndex = -1; // Reset selection
-            }
-            else if (keyEvent.Keycode == Key.Key1) // Toggle to Move Mode
-            {
-                _gizmo.Mode = Gizmo3D.ToolMode.Move;
-                GD.Print("Gizmo Mode: Move");
-            }
-            else if (keyEvent.Keycode == Key.Key2) // Toggle to Scale Mode
-            {
-                _gizmo.Mode = Gizmo3D.ToolMode.Scale;
-                GD.Print("Gizmo Mode: Scale");
-            }
-            else if (keyEvent.Keycode == Key.Key3) // Toggle to Rotate Mode
-            {
-                _gizmo.Mode = Gizmo3D.ToolMode.Rotate;
-                GD.Print("Gizmo Mode: Rotate");
-            }
-            else if (keyEvent.Keycode == Key.Escape) // 🟢 Deselect sphere on Escape key
-            {
-                DeselectSphere();
-                GD.Print("Deselected sphere.");
-            }
-            
-            else if (keyEvent.Keycode == Key.Space)
-            {
-                TogglePause();
-            }
-            
-            else if (keyEvent.Keycode == Key.R)
-            {
-                ResetCurve();
+                case Key.Down:
+                    if (_selectedSphereIndex != -1)
+                    {
+                        RemovePoint(_selectedSphereIndex);
+                        _selectedSphereIndex = -1;
+                    }
+                    break;
+
+                case Key.Key1:
+                    _gizmo.Mode = Gizmo3D.ToolMode.Move;
+                    GD.Print("Gizmo Mode: Move");
+                    break;
+
+                case Key.Key2:
+                    _gizmo.Mode = Gizmo3D.ToolMode.Scale;
+                    GD.Print("Gizmo Mode: Scale");
+                    break;
+
+                case Key.Key3:
+                    _gizmo.Mode = Gizmo3D.ToolMode.Rotate;
+                    GD.Print("Gizmo Mode: Rotate");
+                    break;
+
+                case Key.Escape:
+                    DeselectSphere();
+                    GD.Print("Deselected sphere.");
+                    break;
+
+                case Key.Space:
+                    TogglePause();
+                    break;
+
+                case Key.R:
+                    ResetCurve();
+                    break;
+
+                case Key.Backslash:
+                    _showDebugUI = !_showDebugUI;
+                    break;
             }
         }
     }
+
     public override void _ExitTree()
     {
         if (_gizmo != null && IsInstanceValid(_gizmo))
@@ -171,6 +185,12 @@ public partial class A5_Testing : Node
     {
         _isPaused = !_isPaused;
         GD.Print(_isPaused ? "Paused" : "Resumed");
+    }
+
+    void ToggleUI()
+    {
+        _showDebugUI = !_showDebugUI;
+        RuntimeConsole.Toggle();
     }
     public void ResetCurve()
     {
@@ -344,7 +364,7 @@ public partial class A5_Testing : Node
         Vector3 inHandle = Vector3.Zero;
         Vector3 outHandle = Vector3.Zero;
 
-        // If there's at least one point, calculate tangents
+        // If there's at least one point, calculate tangents (Was Causing severe issues earlier; whoops)
         if (index > 0)
         {
             Vector3 prevPoint = _curve.GetPointPosition(index - 1);
@@ -528,66 +548,86 @@ public partial class A5_Testing : Node
     }
     
     //Visual and Animation Extras
-    private void AddMovingObject()
+   private void AddMovingObject()
+{
+    // Create the cube body
+    var cube = new CsgBox3D();
+    cube.Size = new Vector3(0.2f, 0.2f, 0.2f);
+
+    StandardMaterial3D cubeMat = new StandardMaterial3D();
+    cubeMat.AlbedoColor = Colors.Cyan;
+    cube.Material = cubeMat;
+
+    //Mouth
+    var mouthSphere = new CsgSphere3D();
+    mouthSphere.Radius = 0.08f;
+    mouthSphere.Position = new Vector3(0, 0, 0.12f);
+    mouthSphere.RotationDegrees = new Vector3(90, 0, 0);
+    mouthSphere.Operation = CsgPrimitive3D.OperationEnum.Subtraction;
+    cube.AddChild(mouthSphere);
+
+    //Mouth Animation 
+    var timer = new Timer { WaitTime = 0.05, Autostart = true, OneShot = false };
+    AddChild(timer);
+
+    float phase = 0f;
+    timer.Timeout += () =>
     {
-        // Create the cube body
-        var cube = new CsgBox3D();
-        cube.Size = new Vector3(0.2f, 0.2f, 0.2f);
+        if (_isPaused) return;
+        
+        phase += 0.2f;
+        float scaleY = Mathf.Lerp(0.05f, 0.8f, (Mathf.Sin(phase) + 1f) * 0.5f);
+        mouthSphere.Scale = new Vector3(1f, scaleY, 1f);
+    };
 
-        StandardMaterial3D cubeMat = new StandardMaterial3D();
-        cubeMat.AlbedoColor = Colors.Cyan;
-        cube.Material = cubeMat;
 
-        // Create the left eye (CSG Sphere)
-        var leftEye = new CsgSphere3D();
-        leftEye.Radius = 0.04f;
-        leftEye.Position = new Vector3(-0.05f, 0.05f, 0.11f); 
+    //Eyes
+    var scleraMat = new StandardMaterial3D { AlbedoColor = Colors.White };
+    var pupilMat = new StandardMaterial3D { AlbedoColor = Colors.Black };
 
-        StandardMaterial3D scleraMat = new StandardMaterial3D();
-        scleraMat.AlbedoColor = Colors.White;
-        leftEye.Material = scleraMat;
+    var leftEye = new CsgSphere3D
+    {
+        Radius = 0.04f,
+        Position = new Vector3(-0.05f, 0.05f, 0.11f),
+        Material = scleraMat
+    };
+    var leftPupil = new MeshInstance3D
+    {
+        Mesh = new SphereMesh { Radius = 0.02f, Height = 0.04f },
+        Position = new Vector3(0, 0, 0.025f),
+        MaterialOverride = pupilMat
+    };
+    leftEye.AddChild(leftPupil);
 
-        // Create left pupil (MeshInstance3D instead of CSG)
-        var leftPupil = new MeshInstance3D();
-        leftPupil.Mesh = new SphereMesh()
-        {
-            Radius = 0.02f, // Smaller than sclera
-            Height = 0.04f
-        };
-        leftPupil.Position = new Vector3(0, 0, 0.025f); // Move slightly forward inside eye
+    var rightEye = new CsgSphere3D
+    {
+        Radius = 0.04f,
+        Position = new Vector3(0.05f, 0.05f, 0.11f),
+        Material = scleraMat
+    };
+    var rightPupil = new MeshInstance3D
+    {
+        Mesh = new SphereMesh { Radius = 0.02f, Height = 0.04f },
+        Position = new Vector3(0, 0, 0.025f),
+        MaterialOverride = pupilMat
+    };
+    rightEye.AddChild(rightPupil);
 
-        StandardMaterial3D pupilMat = new StandardMaterial3D();
-        pupilMat.AlbedoColor = Colors.Black;
-        leftPupil.MaterialOverride = pupilMat;
+    cube.AddChild(leftEye);
+    cube.AddChild(rightEye);
 
-        // Parent pupil to eye
-        leftEye.AddChild(leftPupil);
+    // Assign Dirpy
+    _cube = cube;
+    AddChild(_cube);
+}
 
-        // Create the right eye (Duplicate left eye)
-        var rightEye = new CsgSphere3D();
-        rightEye.Radius = 0.04f;
-        rightEye.Position = new Vector3(0.05f, 0.05f, 0.11f);
-        rightEye.Material = scleraMat;
+    void DrawImGui()
+    {
+        ImGui.Begin("Sphere Info");
+        
+        foreach(var sphere in _spheres)
+            ImGui.Text("Sphere " + sphere.Key.ToString() + " pos : " + sphere.Value.Position.ToString());
 
-        // Create right pupil (Another MeshInstance3D)
-        var rightPupil = new MeshInstance3D();
-        rightPupil.Mesh = new SphereMesh()
-        {
-            Radius = 0.02f,
-            Height = 0.04f
-        };
-        rightPupil.Position = new Vector3(0, 0, 0.025f);
-        rightPupil.MaterialOverride = pupilMat;
-
-        // Parent pupil to right eye
-        rightEye.AddChild(rightPupil);
-
-        // Parent eyes to cube
-        cube.AddChild(leftEye);
-        cube.AddChild(rightEye);
-
-        // Assign to class variable for movement
-        _cube = cube;
-        AddChild(_cube);
+        ImGui.End();
     }
 }
