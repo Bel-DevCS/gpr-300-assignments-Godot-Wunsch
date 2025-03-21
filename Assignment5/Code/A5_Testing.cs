@@ -15,7 +15,7 @@ public partial class A5_Testing : Node
     //Runtime Objects
     private CsgBox3D _cube;
     private Gizmo3D _gizmo = new();
-    Curve3D _curve = new Curve3D();
+    Curve3D _curve = new();
     
     //Runtime Variables
     private float _progress = 0f;

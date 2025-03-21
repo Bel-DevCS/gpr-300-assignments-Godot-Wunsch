@@ -16,6 +16,12 @@ public static class RuntimeConsole
     private static string _inputBuffer = "";
     private static bool _isTyping = false;
     public static bool IsTyping => _isTyping;
+    
+    private static bool _showInfo = true;
+    private static bool _showSystem = true;
+    private static bool _showError = true;
+    private static bool _showAdmin = true;
+
 
     private enum LogType
     {
@@ -74,6 +80,19 @@ public static class RuntimeConsole
         {
             if (ImGui.Button("Clear"))
                 _logs.Clear();
+            
+            ImGui.Text("Filter:");
+            ImGui.SameLine();
+            ImGui.Checkbox("Info", ref _showInfo);
+            ImGui.SameLine();
+            ImGui.Checkbox("System", ref _showSystem);
+            ImGui.SameLine();
+            ImGui.Checkbox("Error", ref _showError);
+            ImGui.SameLine();
+            ImGui.Checkbox("Admin", ref _showAdmin);
+
+            ImGui.Separator();
+
 
             ImGui.Separator();
 
@@ -81,6 +100,14 @@ public static class RuntimeConsole
 
             foreach (var (message, type) in _logs)
             {
+                if ((type == LogType.Info && !_showInfo) ||
+                    (type == LogType.System && !_showSystem) ||
+                    (type == LogType.Error && !_showError) ||
+                    (type == LogType.Admin && !_showAdmin))
+                {
+                    continue;
+                }
+
                 bool pushedColor = false;
 
                 switch (type)
@@ -96,9 +123,9 @@ public static class RuntimeConsole
                 }
 
                 ImGui.TextUnformatted(message);
-
                 if (pushedColor) ImGui.PopStyleColor();
             }
+
 
             if (_autoScroll && ImGui.GetScrollY() >= ImGui.GetScrollMaxY())
             {
@@ -161,6 +188,5 @@ public static class RuntimeConsole
     {
         return Engine.IsEditorHint() ? null : (SceneTree)Engine.GetMainLoop();
     }
-
-
+    
 }
