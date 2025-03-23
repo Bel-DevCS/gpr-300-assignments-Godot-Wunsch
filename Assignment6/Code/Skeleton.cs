@@ -9,10 +9,18 @@ public class Skeleton
     public Skeleton()
     {
         Root = CreateJoint("Torso", null);
+        Root.LocalPosition = new Vector3(0, 0, 0);
+
         var shoulder = CreateJoint("Shoulder", Root);
+        shoulder.LocalPosition = new Vector3(0, 0.5f, 0);
+
         var elbow = CreateJoint("Elbow", shoulder);
+        elbow.LocalPosition = new Vector3(0, 0.5f, 0);
+
         var wrist = CreateJoint("Wrist", elbow);
+        wrist.LocalPosition = new Vector3(0, 0.5f, 0);
     }
+
 
     public Joint CreateJoint(string name, Joint parent)
     {

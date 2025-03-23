@@ -1,3 +1,13 @@
-[gd_scene format=3 uid="uid://dfth6jxtq4cnf"]
+[gd_scene load_steps=3 format=3 uid="uid://dfth6jxtq4cnf"]
+
+[ext_resource type="Script" uid="uid://cya5uty8rxke5" path="res://Assignment6/Code/A6_Project.cs" id="1_eohe0"]
+[ext_resource type="Script" uid="uid://ddn777j4den4n" path="res://Assignment6/Code/A6_CameraController.cs" id="2_eohe0"]
 
 [node name="Assignment6" type="Node3D"]
+script = ExtResource("1_eohe0")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+script = ExtResource("2_eohe0")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.637733, 0.770257, 0, -0.770257, 0.637733, 0, 0.96394, 0)
