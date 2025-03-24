@@ -11,6 +11,7 @@ public class Skeleton
         Root = CreateJoint("Torso", null);
         Root.LocalPosition = new Vector3(0, 0, 0);
 
+        /*
         var shoulder = CreateJoint("Shoulder", Root);
         shoulder.LocalPosition = new Vector3(0, 0.5f, 0);
 
@@ -19,6 +20,7 @@ public class Skeleton
 
         var wrist = CreateJoint("Wrist", elbow);
         wrist.LocalPosition = new Vector3(0, 0.5f, 0);
+        */
     }
 
 
