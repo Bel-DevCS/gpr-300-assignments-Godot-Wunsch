@@ -119,9 +119,9 @@ public partial class A6_Project : Node3D
         if (ImGui.Begin("Skeleton Joints"))
         {
             DrawJointRecursive(_skeleton.Root);
-            ImGui.End();
+           
         }
-
+        ImGui.End();
     }
 
 
@@ -283,23 +283,72 @@ private void UpdateImGuiScale()
     private void DrawBoneLines()
     {
         _boneLines.ClearSurfaces();
-
-        _boneLines.SurfaceBegin(Mesh.PrimitiveType.Lines);
+        _boneLines.SurfaceBegin(Mesh.PrimitiveType.Triangles);
 
         foreach (var joint in _skeleton.AllJoints)
         {
-            if (joint.Parent != null)
-            {
-                var start = joint.Parent.GlobalTransform.Origin;
-                var end = joint.GlobalTransform.Origin;
+            if (joint.Parent == null) continue;
 
-                _boneLines.SurfaceAddVertex(start);
-                _boneLines.SurfaceAddVertex(end);
-            }
+            var start = joint.Parent.GlobalTransform.Origin;
+            var end = joint.GlobalTransform.Origin;
+
+            var dir = (end - start).Normalized();
+            var length = (end - start).Length();
+            var up = Vector3.Up;
+
+            if (Mathf.Abs(dir.Dot(up)) > 0.99f)
+                up = Vector3.Right; // avoid gimbal lock
+
+            var right = dir.Cross(up).Normalized();
+            up = right.Cross(dir).Normalized();
+
+            float halfWidth = 0.02f;
+
+            // Build 8 corners of the prism
+            Vector3 offset1 = right * halfWidth + up * halfWidth;
+            Vector3 offset2 = right * halfWidth - up * halfWidth;
+            Vector3 offset3 = -right * halfWidth + up * halfWidth;
+            Vector3 offset4 = -right * halfWidth - up * halfWidth;
+
+            Vector3 p0 = start + offset1;
+            Vector3 p1 = start + offset2;
+            Vector3 p2 = start + offset3;
+            Vector3 p3 = start + offset4;
+
+            Vector3 p4 = end + offset1;
+            Vector3 p5 = end + offset2;
+            Vector3 p6 = end + offset3;
+            Vector3 p7 = end + offset4;
+
+            // Front face
+            AddQuad(p0, p1, p5, p4);
+            // Back face
+            AddQuad(p3, p2, p6, p7);
+            // Top face
+            AddQuad(p2, p0, p4, p6);
+            // Bottom face
+            AddQuad(p1, p3, p7, p5);
+            // Left face
+            AddQuad(p2, p3, p1, p0);
+            // Right face
+            AddQuad(p4, p5, p7, p6);
         }
 
         _boneLines.SurfaceEnd();
     }
+
+    private void AddQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
+    {
+        _boneLines.SurfaceAddVertex(a);
+        _boneLines.SurfaceAddVertex(b);
+        _boneLines.SurfaceAddVertex(c);
+
+        _boneLines.SurfaceAddVertex(a);
+        _boneLines.SurfaceAddVertex(c);
+        _boneLines.SurfaceAddVertex(d);
+    }
+
+
     
     private void DrawJointRecursive(Joint joint)
     {
