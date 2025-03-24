@@ -19,69 +19,64 @@ public partial class A6_Project : Node3D
     private const float BaseScale = 1.0f;
 
     [Export] private ShaderMaterial _stylizedMaterial;
-   public override void _Ready()
+  public override void _Ready()
     {
         _skeleton = new Skeleton();
 
-        // Core body proportions (stylized)
         var torso = _skeleton.Root;
         torso.Name = "Torso";
         torso.LocalPosition = new Vector3(0, 0, 0);
 
         var neck = _skeleton.CreateJoint("Neck", torso);
-        neck.LocalPosition = new Vector3(0, 0.25f, 0);
+        neck.LocalPosition = new Vector3(0, 0.22f, 0);
 
         var head = _skeleton.CreateJoint("Head", neck);
-        head.LocalPosition = new Vector3(0, 0.45f, 0);
+        head.LocalPosition = new Vector3(0, 0.35f, 0);
 
-        // Left Arm
         var lShoulder = _skeleton.CreateJoint("LeftShoulder", torso);
-        lShoulder.LocalPosition = new Vector3(-0.2f, 0.2f, 0);
+        lShoulder.LocalPosition = new Vector3(-0.18f, 0.18f, 0);
 
         var lElbow = _skeleton.CreateJoint("LeftElbow", lShoulder);
-        lElbow.LocalPosition = new Vector3(-0.2f, 0, 0);
+        lElbow.LocalPosition = new Vector3(-0.18f, 0, 0);
 
         var lWrist = _skeleton.CreateJoint("LeftWrist", lElbow);
-        lWrist.LocalPosition = new Vector3(-0.2f, 0, 0);
+        lWrist.LocalPosition = new Vector3(-0.16f, 0, 0);
 
         var lHand = _skeleton.CreateJoint("LeftHand", lWrist);
-        lHand.LocalPosition = new Vector3(-0.1f, 0, 0);
+        lHand.LocalPosition = new Vector3(-0.08f, 0, 0);
 
-        // Right Arm
         var rShoulder = _skeleton.CreateJoint("RightShoulder", torso);
-        rShoulder.LocalPosition = new Vector3(0.2f, 0.2f, 0);
+        rShoulder.LocalPosition = new Vector3(0.18f, 0.18f, 0);
 
         var rElbow = _skeleton.CreateJoint("RightElbow", rShoulder);
-        rElbow.LocalPosition = new Vector3(0.2f, 0, 0);
+        rElbow.LocalPosition = new Vector3(0.18f, 0, 0);
 
         var rWrist = _skeleton.CreateJoint("RightWrist", rElbow);
-        rWrist.LocalPosition = new Vector3(0.2f, 0, 0);
+        rWrist.LocalPosition = new Vector3(0.16f, 0, 0);
 
         var rHand = _skeleton.CreateJoint("RightHand", rWrist);
-        rHand.LocalPosition = new Vector3(0.1f, 0, 0);
+        rHand.LocalPosition = new Vector3(0.08f, 0, 0);
 
-        // Left Leg
         var lHip = _skeleton.CreateJoint("LeftHip", torso);
-        lHip.LocalPosition = new Vector3(-0.12f, -0.25f, 0);
+        lHip.LocalPosition = new Vector3(-0.1f, -0.2f, 0);
 
         var lKnee = _skeleton.CreateJoint("LeftKnee", lHip);
-        lKnee.LocalPosition = new Vector3(0, -0.25f, 0);
+        lKnee.LocalPosition = new Vector3(0, -0.22f, 0);
 
         var lAnkle = _skeleton.CreateJoint("LeftAnkle", lKnee);
-        lAnkle.LocalPosition = new Vector3(0, -0.15f, 0);
+        lAnkle.LocalPosition = new Vector3(0, -0.12f, 0);
 
         var lFoot = _skeleton.CreateJoint("LeftFoot", lAnkle);
         lFoot.LocalPosition = new Vector3(0, -0.05f, 0.1f);
 
-        // Right Leg
         var rHip = _skeleton.CreateJoint("RightHip", torso);
-        rHip.LocalPosition = new Vector3(0.12f, -0.25f, 0);
+        rHip.LocalPosition = new Vector3(0.1f, -0.2f, 0);
 
         var rKnee = _skeleton.CreateJoint("RightKnee", rHip);
-        rKnee.LocalPosition = new Vector3(0, -0.25f, 0);
+        rKnee.LocalPosition = new Vector3(0, -0.22f, 0);
 
         var rAnkle = _skeleton.CreateJoint("RightAnkle", rKnee);
-        rAnkle.LocalPosition = new Vector3(0, -0.15f, 0);
+        rAnkle.LocalPosition = new Vector3(0, -0.12f, 0);
 
         var rFoot = _skeleton.CreateJoint("RightFoot", rAnkle);
         rFoot.LocalPosition = new Vector3(0, -0.05f, 0.1f);
@@ -96,7 +91,9 @@ public partial class A6_Project : Node3D
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
             MaterialOverride = new StandardMaterial3D
             {
-                AlbedoColor = new Color(1f, 1f, 0.5f)
+                AlbedoColor = new Color(0.3f, 0.3f, 0.3f),
+                Transparency = BaseMaterial3D.TransparencyEnum.Disabled,
+                Roughness = 1.0f
             }
         };
         AddChild(_boneRenderer);
@@ -151,7 +148,13 @@ public partial class A6_Project : Node3D
             }
             else if (name.Contains("torso"))
             {
-                mesh = new BoxMesh { Size = new Vector3(0.18f, 0.3f, 0.1f) };
+                mesh = new CapsuleMesh 
+                {
+                    Radius = 0.1f,
+                    Height = 0.4f,
+                    RadialSegments = 8,
+                    Rings = 4 
+                };
             }
             else if (name.Contains("shoulder") || name.Contains("elbow") || name.Contains("knee"))
             {
