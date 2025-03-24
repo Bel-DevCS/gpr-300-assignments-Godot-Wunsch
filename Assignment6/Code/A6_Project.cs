@@ -19,89 +19,89 @@ public partial class A6_Project : Node3D
     private const float BaseScale = 1.0f;
 
 
-  public override void _Ready()
-{
-    _skeleton = new Skeleton();
-
-    // Core body
-    var torso = _skeleton.Root;
-    torso.Name = "Torso";
-    torso.LocalPosition = new Vector3(0, 0, 0);
-
-    var neck = _skeleton.CreateJoint("Neck", torso);
-    neck.LocalPosition = new Vector3(0, 0.220f, 0);
-
-    var head = _skeleton.CreateJoint("Head", neck);
-    head.LocalPosition = new Vector3(0, 1.4f, 0);
-
-    // Left Arm
-    var lShoulder = _skeleton.CreateJoint("LeftShoulder", torso);
-    lShoulder.LocalPosition = new Vector3(-0.15f, 0.16f, 0);
-    
-    var lElbow = _skeleton.CreateJoint("LeftElbow", lShoulder);
-    lElbow.LocalPosition = new Vector3(-0.25f, 0, 0);
-
-    var lWrist = _skeleton.CreateJoint("LeftWrist", lElbow);
-    lWrist.LocalPosition = new Vector3(-0.25f, 0, 0);
-
-    var lHand = _skeleton.CreateJoint("LeftHand", lWrist);
-    lHand.LocalPosition = new Vector3(-0.1f, 0, 0);
-
-    // Right Arm
-    var rShoulder = _skeleton.CreateJoint("RightShoulder", torso);
-    rShoulder.LocalPosition = new Vector3(0.15f, 0.16f, 0);
-
-    var rElbow = _skeleton.CreateJoint("RightElbow", rShoulder);
-    rElbow.LocalPosition = new Vector3(0.25f, 0, 0);
-
-    var rWrist = _skeleton.CreateJoint("RightWrist", rElbow);
-    rWrist.LocalPosition = new Vector3(0.25f, 0, 0);
-
-    var rHand = _skeleton.CreateJoint("RightHand", rWrist);
-    rHand.LocalPosition = new Vector3(0.1f, 0, 0);
-
-    // Left Leg
-    var lHip = _skeleton.CreateJoint("LeftHip", torso);
-    lHip.LocalPosition = new Vector3(-0.15f, -0.3f, 0);
-
-    var lKnee = _skeleton.CreateJoint("LeftKnee", lHip);
-    lKnee.LocalPosition = new Vector3(0, -0.4f, 0);
-
-    var lAnkle = _skeleton.CreateJoint("LeftAnkle", lKnee);
-    lAnkle.LocalPosition = new Vector3(0, -0.4f, 0);
-
-    var lFoot = _skeleton.CreateJoint("LeftFoot", lAnkle);
-    lFoot.LocalPosition = new Vector3(0, -0.05f, 0.1f);
-
-    // Right Leg
-    var rHip = _skeleton.CreateJoint("RightHip", torso);
-    rHip.LocalPosition = new Vector3(0.15f, -0.3f, 0);
-
-    var rKnee = _skeleton.CreateJoint("RightKnee", rHip);
-    rKnee.LocalPosition = new Vector3(0, -0.4f, 0);
-
-    var rAnkle = _skeleton.CreateJoint("RightAnkle", rKnee);
-    rAnkle.LocalPosition = new Vector3(0, -0.4f, 0);
-
-    var rFoot = _skeleton.CreateJoint("RightFoot", rAnkle);
-    rFoot.LocalPosition = new Vector3(0, -0.05f, 0.1f);
-    
-    ApplyAPose();
-    CreateVisualJoints();
-    
-    _boneLines = new ImmediateMesh();
-    _boneRenderer = new MeshInstance3D
+   public override void _Ready()
     {
-        Mesh = _boneLines,
-        CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-        MaterialOverride = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(1f, 1f, 0.5f)
-        }
-    };
-    AddChild(_boneRenderer);
+        _skeleton = new Skeleton();
 
-}
+        // Core body proportions (stylized)
+        var torso = _skeleton.Root;
+        torso.Name = "Torso";
+        torso.LocalPosition = new Vector3(0, 0, 0);
+
+        var neck = _skeleton.CreateJoint("Neck", torso);
+        neck.LocalPosition = new Vector3(0, 0.25f, 0);
+
+        var head = _skeleton.CreateJoint("Head", neck);
+        head.LocalPosition = new Vector3(0, 0.45f, 0);
+
+        // Left Arm
+        var lShoulder = _skeleton.CreateJoint("LeftShoulder", torso);
+        lShoulder.LocalPosition = new Vector3(-0.2f, 0.2f, 0);
+
+        var lElbow = _skeleton.CreateJoint("LeftElbow", lShoulder);
+        lElbow.LocalPosition = new Vector3(-0.2f, 0, 0);
+
+        var lWrist = _skeleton.CreateJoint("LeftWrist", lElbow);
+        lWrist.LocalPosition = new Vector3(-0.2f, 0, 0);
+
+        var lHand = _skeleton.CreateJoint("LeftHand", lWrist);
+        lHand.LocalPosition = new Vector3(-0.1f, 0, 0);
+
+        // Right Arm
+        var rShoulder = _skeleton.CreateJoint("RightShoulder", torso);
+        rShoulder.LocalPosition = new Vector3(0.2f, 0.2f, 0);
+
+        var rElbow = _skeleton.CreateJoint("RightElbow", rShoulder);
+        rElbow.LocalPosition = new Vector3(0.2f, 0, 0);
+
+        var rWrist = _skeleton.CreateJoint("RightWrist", rElbow);
+        rWrist.LocalPosition = new Vector3(0.2f, 0, 0);
+
+        var rHand = _skeleton.CreateJoint("RightHand", rWrist);
+        rHand.LocalPosition = new Vector3(0.1f, 0, 0);
+
+        // Left Leg
+        var lHip = _skeleton.CreateJoint("LeftHip", torso);
+        lHip.LocalPosition = new Vector3(-0.12f, -0.25f, 0);
+
+        var lKnee = _skeleton.CreateJoint("LeftKnee", lHip);
+        lKnee.LocalPosition = new Vector3(0, -0.25f, 0);
+
+        var lAnkle = _skeleton.CreateJoint("LeftAnkle", lKnee);
+        lAnkle.LocalPosition = new Vector3(0, -0.15f, 0);
+
+        var lFoot = _skeleton.CreateJoint("LeftFoot", lAnkle);
+        lFoot.LocalPosition = new Vector3(0, -0.05f, 0.1f);
+
+        // Right Leg
+        var rHip = _skeleton.CreateJoint("RightHip", torso);
+        rHip.LocalPosition = new Vector3(0.12f, -0.25f, 0);
+
+        var rKnee = _skeleton.CreateJoint("RightKnee", rHip);
+        rKnee.LocalPosition = new Vector3(0, -0.25f, 0);
+
+        var rAnkle = _skeleton.CreateJoint("RightAnkle", rKnee);
+        rAnkle.LocalPosition = new Vector3(0, -0.15f, 0);
+
+        var rFoot = _skeleton.CreateJoint("RightFoot", rAnkle);
+        rFoot.LocalPosition = new Vector3(0, -0.05f, 0.1f);
+
+        ApplyAPose();
+        CreateVisualJoints();
+
+        _boneLines = new ImmediateMesh();
+        _boneRenderer = new MeshInstance3D
+        {
+            Mesh = _boneLines,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+            MaterialOverride = new StandardMaterial3D
+            {
+                AlbedoColor = new Color(1f, 1f, 0.5f)
+            }
+        };
+        AddChild(_boneRenderer);
+    }
+
 
 
     public override void _Process(double delta)
@@ -127,127 +127,78 @@ public partial class A6_Project : Node3D
 
 
     
-   private void CreateVisualJoints()
-{
-    foreach (var joint in _skeleton.AllJoints)
+  private void CreateVisualJoints()
     {
-        var meshInstance = new MeshInstance3D();
-        PrimitiveMesh mesh;
+        foreach (var joint in _skeleton.AllJoints)
+        {
+            var meshInstance = new MeshInstance3D();
+            PrimitiveMesh mesh;
+            string name = joint.Name.ToLowerInvariant();
 
-        string name = joint.Name.ToLowerInvariant();
-        
-        // HEAD
-        if (name.Contains("head"))
-        {
-            mesh = new SphereMesh
+            if (name.Contains("head"))
             {
-                Radius = 0.15f,
-                Height = 0.25f, // let it be taller
-                RadialSegments = 12,
-                Rings = 6
-            };
-        }
+                mesh = new SphereMesh 
+                {
+                        Radius = 0.15f,
+                        Height = 0.25f,
+                        RadialSegments = 12,
+                        Rings = 6
+                };
+            }
+            else if (name.Contains("neck"))
+            {
+                mesh = new CylinderMesh { TopRadius = 0.06f, BottomRadius = 0.06f, Height = 0.1f, RadialSegments = 6 };
+            }
+            else if (name.Contains("torso"))
+            {
+                mesh = new BoxMesh { Size = new Vector3(0.18f, 0.3f, 0.1f) };
+            }
+            else if (name.Contains("shoulder") || name.Contains("elbow") || name.Contains("knee"))
+            {
+                mesh = new SphereMesh { Radius = 0.08f, Height = 0.08f, RadialSegments = 6, Rings = 3 };
+            }
+            else if (name.Contains("arm") || name.Contains("leg") || name.Contains("hip"))
+            {
+                mesh = new CapsuleMesh { Radius = 0.075f, Height = 0.2f, RadialSegments = 6, Rings = 3 };
+            }
+            else if (name.Contains("wrist") || name.Contains("ankle"))
+            {
+                mesh = new SphereMesh { Radius = 0.06f, Height = 0.06f, RadialSegments = 6, Rings = 3 };
+            }
+            else if (name.Contains("hand"))
+            {
+                mesh = new BoxMesh { Size = new Vector3(0.1f, 0.05f, 0.1f) };
+            }
+            else if (name.Contains("foot"))
+            {
+                mesh = new BoxMesh { Size = new Vector3(0.12f, 0.05f, 0.15f) };
+            }
+            else
+            {
+                mesh = new BoxMesh { Size = new Vector3(0.1f, 0.1f, 0.1f) };
+            }
 
-        // NECK or joints connecting to head
-        else if (name.Contains("neck"))
-        {
-            mesh = new CylinderMesh
+            meshInstance.Mesh = mesh;
+            var material = new StandardMaterial3D
             {
-                TopRadius = 0.05f,
-                BottomRadius = 0.05f,
-                Height = 0.1f,
-                RadialSegments = 8
+                AlbedoColor = GetColorForJoint(name),
+                Roughness = 0.9f
             };
+            meshInstance.MaterialOverride = material;
+            AddChild(meshInstance);
+            _jointVisuals[joint] = meshInstance;
         }
-        // TORSO
-        else if (name.Contains("torso"))
-        {
-            mesh = new CylinderMesh
-            {
-                TopRadius = 0.1f,
-                BottomRadius = 0.1f,
-                Height = 0.4f,
-                RadialSegments = 12
-            };
-        }
-        // SHOULDERS, ELBOWS, KNEES (pivot joints)
-        else if (name.Contains("shoulder") || name.Contains("elbow") || name.Contains("knee"))
-        {
-            mesh = new SphereMesh
-            {
-                Radius = 0.07f,
-                Height = 0.07f,
-                RadialSegments = 8,
-                Rings = 4
-            };
-        }
-        // ARMS / LEGS (longer segments)
-        else if (name.Contains("arm") || name.Contains("leg") || name.Contains("hip"))
-        {
-            mesh = new CapsuleMesh
-            {
-                Radius = 0.06f,
-                Height = 0.2f,
-                RadialSegments = 8,
-                Rings = 4
-            };
-        }
-        // WRISTS / ANKLES
-        else if (name.Contains("wrist") || name.Contains("ankle"))
-        {
-            mesh = new SphereMesh
-            {
-                Radius = 0.05f,
-                Height = 0.05f,
-                RadialSegments = 6,
-                Rings = 3
-            };
-        }
-        // HANDS / FEET
-        else if (name.Contains("hand") || name.Contains("foot"))
-        {
-            mesh = new BoxMesh
-            {
-                Size = new Vector3(0.1f, 0.05f, 0.1f)
-            };
-        }
-     
-        // Fallback
-        else
-        {
-            mesh = new BoxMesh
-            {
-                Size = new Vector3(0.1f, 0.1f, 0.1f)
-            };
-        }
-
-        meshInstance.Mesh = mesh;
-
-        var material = new StandardMaterial3D
-        {
-            AlbedoColor = GetColorForJoint(name),
-            Roughness = 0.9f
-        };
-
-        meshInstance.MaterialOverride = material;
-        AddChild(meshInstance);
-        _jointVisuals[joint] = meshInstance;
     }
-}
 
-    
-private Color GetColorForJoint(string name)
-{
-    if (name.Contains("head") || name.Contains("hand"))
-        return new Color(1f, 0.8f, 0.6f); // Skin tone
-
-    if (name.Contains("torso")) return new Color(0.2f, 0.6f, 1f);         // Shirt
-    if (name.Contains("leg") || name.Contains("hip") || name.Contains("knee")) return new Color(0.1f, 0.1f, 0.1f); // Pants
-    if (name.Contains("foot") || name.Contains("ankle")) return new Color(0.1f, 0.1f, 0.1f); // Shoes
-    if (name.Contains("arm") || name.Contains("shoulder") || name.Contains("elbow")) return new Color(1f, 0.8f, 0.6f); // Arms
-
-    return new Color(1, 1, 1); // fallback white
-}
+    private Color GetColorForJoint(string name)
+    {
+        if (name.Contains("head") || name.Contains("hand")) return new Color(1f, 0.8f, 0.6f);
+        if (name.Contains("torso")) return new Color(0.2f, 0.6f, 1f);
+        if (name.Contains("leg") || name.Contains("hip") || name.Contains("knee")) return new Color(0.1f, 0.1f, 0.1f);
+        if (name.Contains("foot") || name.Contains("ankle")) return new Color(0.1f, 0.1f, 0.1f);
+        if (name.Contains("arm") || name.Contains("shoulder") || name.Contains("elbow")) return new Color(1f, 0.8f, 0.6f);
+        return new Color(1, 1, 1);
+    }
 
 
 private Vector2 _lastViewportSize = Vector2.Zero;
@@ -352,36 +303,31 @@ private void UpdateImGuiScale()
     
     private void DrawJointRecursive(Joint joint)
     {
-        ImGui.PushID(joint.Name); // Prevent ID collisions
+        ImGui.PushID(joint.Name);
 
-        if (ImGui.TreeNode(joint.Name))
+        bool open = ImGui.TreeNodeEx(joint.Name, ImGuiTreeNodeFlags.DefaultOpen);
+
+        if (open)
         {
-            if (ImGui.TreeNode("Transform"))
+            var pos = joint.LocalPosition.ToNumerics();
+            var rot = joint.LocalRotation.ToNumerics();
+            var scale = joint.LocalScale.ToNumerics();
+
+            if (ImGui.DragFloat3("Position##" + joint.Name, ref pos, 0.01f))
+                joint.LocalPosition = pos.ToGodot();
+
+            if (ImGui.DragFloat3("Rotation##" + joint.Name, ref rot, 0.5f))
+                joint.LocalRotation = rot.ToGodot();
+
+            if (ImGui.DragFloat3("Scale##" + joint.Name, ref scale, 0.01f))
+                joint.LocalScale = scale.ToGodot();
+
+
+            if (joint.Children.Count > 0 && ImGui.TreeNode("Children##" + joint.Name))
             {
-                var pos = joint.LocalPosition.ToNumerics();
-                var rot = joint.LocalRotation.ToNumerics();
-                var scale = joint.LocalScale.ToNumerics();
-
-                if (ImGui.DragFloat3("Position", ref pos, 0.01f))
-                    joint.LocalPosition = pos.ToGodot();
-
-                if (ImGui.DragFloat3("Rotation", ref rot, 0.5f))
-                    joint.LocalRotation = rot.ToGodot();
-
-                if (ImGui.DragFloat3("Scale", ref scale, 0.01f))
-                    joint.LocalScale = scale.ToGodot();
-
+                foreach (var child in joint.Children)
+                    DrawJointRecursive(child);
                 ImGui.TreePop();
-            }
-
-            if (joint.Children.Count > 0)
-            {
-                if (ImGui.TreeNode("Children"))
-                {
-                    foreach (var child in joint.Children)
-                        DrawJointRecursive(child);
-                    ImGui.TreePop();
-                }
             }
 
             ImGui.TreePop();
