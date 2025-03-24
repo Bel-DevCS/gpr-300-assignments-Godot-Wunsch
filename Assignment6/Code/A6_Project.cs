@@ -18,7 +18,7 @@ public partial class A6_Project : Node3D
     private const float BaseHeight = 720f;
     private const float BaseScale = 1.0f;
 
-
+    [Export] private ShaderMaterial _stylizedMaterial;
    public override void _Ready()
     {
         _skeleton = new Skeleton();
@@ -184,7 +184,14 @@ public partial class A6_Project : Node3D
                 AlbedoColor = GetColorForJoint(name),
                 Roughness = 0.9f
             };
-            meshInstance.MaterialOverride = material;
+            
+            meshInstance.Mesh = mesh;
+
+            var instanceMaterial = (ShaderMaterial)_stylizedMaterial.Duplicate();
+            instanceMaterial.SetShaderParameter("albedo_color", GetColorForJoint(name));
+            meshInstance.MaterialOverride = instanceMaterial;
+            meshInstance.CastShadow = GeometryInstance3D.ShadowCastingSetting.On;
+
             AddChild(meshInstance);
             _jointVisuals[joint] = meshInstance;
         }

@@ -1,13 +1,24 @@
-[gd_scene load_steps=3 format=3 uid="uid://dfth6jxtq4cnf"]
+[gd_scene load_steps=5 format=3 uid="uid://dfth6jxtq4cnf"]
 
 [ext_resource type="Script" uid="uid://cya5uty8rxke5" path="res://Assignment6/Code/A6_Project.cs" id="1_eohe0"]
 [ext_resource type="Script" uid="uid://ddn777j4den4n" path="res://Assignment6/Code/A6_CameraController.cs" id="2_eohe0"]
+[ext_resource type="Shader" uid="uid://b14hoihdrv5rt" path="res://Assignment6/Materials/A6_StyalizedShader.gdshader" id="2_ep0ko"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_toqsp"]
+render_priority = 0
+shader = ExtResource("2_ep0ko")
+shader_parameter/albedo_color = Color(1, 0.8, 0.6, 1)
+shader_parameter/shading_levels = 3
+shader_parameter/rim_strength = 0.3
+shader_parameter/gradient_mix = 0.6
 
 [node name="Assignment6" type="Node3D"]
 script = ExtResource("1_eohe0")
+_stylizedMaterial = SubResource("ShaderMaterial_toqsp")
 
 [node name="Camera3D" type="Camera3D" parent="."]
 script = ExtResource("2_eohe0")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.637733, 0.770257, 0, -0.770257, 0.637733, 0, 0.96394, 0)
+transform = Transform3D(1, 0, 0, 0, 0.424816, 0.90528, 0, -0.90528, 0.424816, 0, 0.96394, 0)
+sky_mode = 1
