@@ -11,6 +11,8 @@ shader_parameter/albedo_color = Color(1, 0.8, 0.6, 1)
 shader_parameter/shading_levels = 3
 shader_parameter/rim_strength = 0.3
 shader_parameter/gradient_mix = 0.6
+shader_parameter/specular_size = 1.0
+shader_parameter/specular_intensity = 1.402
 
 [node name="Assignment6" type="Node3D"]
 script = ExtResource("1_eohe0")

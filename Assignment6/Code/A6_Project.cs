@@ -10,6 +10,9 @@ public partial class A6_Project : Node3D
 {
     private Skeleton _skeleton;
     private Dictionary<Joint, MeshInstance3D> _jointVisuals = new();
+    private Dictionary<Joint, Transform3D> _aPoseTransforms = new();
+
+
     
     private ImmediateMesh _boneLines;
     private MeshInstance3D _boneRenderer;
@@ -19,6 +22,8 @@ public partial class A6_Project : Node3D
     private const float BaseScale = 1.0f;
 
     [Export] private ShaderMaterial _stylizedMaterial;
+
+    private Joint _selectedJoint = null;
   public override void _Ready()
     {
         _skeleton = new Skeleton();
@@ -82,6 +87,17 @@ public partial class A6_Project : Node3D
         rFoot.LocalPosition = new Vector3(0, -0.05f, 0.1f);
 
         ApplyAPose();
+        
+        foreach (var joint in _skeleton.AllJoints)
+        {
+            _aPoseTransforms[joint] = new Transform3D(
+                Basis.FromEuler(joint.LocalRotation * Basis.FromEuler(joint.LocalRotation * (Mathf.Pi / 180.0f))),
+                joint.LocalPosition
+            ).Scaled(joint.LocalScale);
+
+        }
+
+        
         CreateVisualJoints();
 
         _boneLines = new ImmediateMesh();
@@ -113,14 +129,73 @@ public partial class A6_Project : Node3D
     {
         UpdateImGuiScale();
 
-        if (ImGui.Begin("Skeleton Joints"))
+        ImGui.Begin("Skeleton Hierarchy");
+        if (_skeleton?.Root != null)
+            DrawJointTree(_skeleton.Root);
+        ImGui.End();
+
+        ImGui.Begin("Joint Inspector");
+
+        if (_selectedJoint != null)
         {
-            DrawJointRecursive(_skeleton.Root);
-           
+            var pos = _selectedJoint.LocalPosition.ToNumerics();
+            var rot = _selectedJoint.LocalRotation.ToNumerics();
+            var scale = _selectedJoint.LocalScale.ToNumerics();
+
+            if (ImGui.DragFloat3("Position", ref pos, 0.01f))
+                _selectedJoint.LocalPosition = pos.ToGodot();
+
+            ImGui.SameLine();
+            if (ImGui.Button("Reset##Pos"))
+                ResetPosition(_selectedJoint);
+
+            if (ImGui.DragFloat3("Rotation", ref rot, 0.5f))
+                _selectedJoint.LocalRotation = rot.ToGodot();
+
+            ImGui.SameLine();
+            if (ImGui.Button("Reset##Rot"))
+                ResetRotation(_selectedJoint);
+
+            if (ImGui.DragFloat3("Scale", ref scale, 0.01f))
+                _selectedJoint.LocalScale = scale.ToGodot();
+
+            ImGui.SameLine();
+            if (ImGui.Button("Reset##Scale"))
+                ResetScale(_selectedJoint);
+
         }
+        else
+        {
+            ImGui.Text("Select a joint from the left.");
+        }
+
         ImGui.End();
     }
 
+
+    private void DrawJointTree(Joint joint)
+    {
+        ImGui.PushID(joint.Name);
+
+        ImGuiTreeNodeFlags flags = (_selectedJoint == joint)
+            ? ImGuiTreeNodeFlags.Selected | ImGuiTreeNodeFlags.OpenOnArrow
+            : ImGuiTreeNodeFlags.OpenOnArrow;
+
+        bool open = ImGui.TreeNodeEx(joint.Name, flags);
+
+        if (ImGui.IsItemClicked())
+            _selectedJoint = joint;
+
+        if (open)
+        {
+            foreach (var child in joint.Children)
+                DrawJointTree(child);
+
+            ImGui.TreePop();
+        }
+
+        ImGui.PopID();
+    }
 
 
     
@@ -231,6 +306,24 @@ private void UpdateImGuiScale()
 }
 
 
+
+private void ResetPosition(Joint joint)
+{
+    if (_aPoseTransforms.TryGetValue(joint, out var transform))
+        joint.LocalPosition = transform.Origin;
+}
+
+private void ResetRotation(Joint joint)
+{
+    if (_aPoseTransforms.TryGetValue(joint, out var transform))
+        joint.LocalRotation = transform.Basis.GetEuler();
+}
+
+private void ResetScale(Joint joint)
+{
+    if (_aPoseTransforms.TryGetValue(joint, out var transform))
+        joint.LocalScale = transform.Basis.Scale;
+}
 
 
     private void UpdateVisualJoints()
