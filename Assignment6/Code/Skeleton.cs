@@ -35,4 +35,10 @@ public class Skeleton
     {
         Root?.UpdateGlobalTransform();
     }
+    
+    public Joint? Find(string name)
+    {
+        return AllJoints.Find(j => j.Name == name);
+    }
+
 }

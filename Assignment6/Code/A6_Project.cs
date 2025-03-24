@@ -3,6 +3,7 @@ using ImGuiNET;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Vector2 = Godot.Vector2;
 using Vector3 = Godot.Vector3;
 
 public partial class A6_Project : Node3D
@@ -13,6 +14,9 @@ public partial class A6_Project : Node3D
     private ImmediateMesh _boneLines;
     private MeshInstance3D _boneRenderer;
 
+    private const float BaseWidth = 1280f;
+    private const float BaseHeight = 720f;
+    private const float BaseScale = 1.0f;
 
 
   public override void _Ready()
@@ -25,14 +29,14 @@ public partial class A6_Project : Node3D
     torso.LocalPosition = new Vector3(0, 0, 0);
 
     var neck = _skeleton.CreateJoint("Neck", torso);
-    neck.LocalPosition = new Vector3(0, 0.3f, 0);
+    neck.LocalPosition = new Vector3(0, 0.220f, 0);
 
     var head = _skeleton.CreateJoint("Head", neck);
-    head.LocalPosition = new Vector3(0, 0.2f, 0);
+    head.LocalPosition = new Vector3(0, 1.4f, 0);
 
     // Left Arm
     var lShoulder = _skeleton.CreateJoint("LeftShoulder", torso);
-    lShoulder.LocalPosition = new Vector3(-0.3f, 0.25f, 0);
+    lShoulder.LocalPosition = new Vector3(-0.15f, 0.16f, 0);
     
     var lElbow = _skeleton.CreateJoint("LeftElbow", lShoulder);
     lElbow.LocalPosition = new Vector3(-0.25f, 0, 0);
@@ -43,15 +47,9 @@ public partial class A6_Project : Node3D
     var lHand = _skeleton.CreateJoint("LeftHand", lWrist);
     lHand.LocalPosition = new Vector3(-0.1f, 0, 0);
 
-    var lThumb = _skeleton.CreateJoint("LeftThumb", lHand);
-    lThumb.LocalPosition = new Vector3(-0.05f, 0.02f, 0);
-
-    var lFingers = _skeleton.CreateJoint("LeftFingers", lHand);
-    lFingers.LocalPosition = new Vector3(-0.07f, -0.02f, 0);
-
     // Right Arm
     var rShoulder = _skeleton.CreateJoint("RightShoulder", torso);
-    rShoulder.LocalPosition = new Vector3(0.3f, 0.25f, 0);
+    rShoulder.LocalPosition = new Vector3(0.15f, 0.16f, 0);
 
     var rElbow = _skeleton.CreateJoint("RightElbow", rShoulder);
     rElbow.LocalPosition = new Vector3(0.25f, 0, 0);
@@ -61,12 +59,6 @@ public partial class A6_Project : Node3D
 
     var rHand = _skeleton.CreateJoint("RightHand", rWrist);
     rHand.LocalPosition = new Vector3(0.1f, 0, 0);
-
-    var rThumb = _skeleton.CreateJoint("RightThumb", rHand);
-    rThumb.LocalPosition = new Vector3(0.05f, 0.02f, 0);
-
-    var rFingers = _skeleton.CreateJoint("RightFingers", rHand);
-    rFingers.LocalPosition = new Vector3(0.07f, -0.02f, 0);
 
     // Left Leg
     var lHip = _skeleton.CreateJoint("LeftHip", torso);
@@ -94,6 +86,7 @@ public partial class A6_Project : Node3D
     var rFoot = _skeleton.CreateJoint("RightFoot", rAnkle);
     rFoot.LocalPosition = new Vector3(0, -0.05f, 0.1f);
     
+    ApplyAPose();
     CreateVisualJoints();
     
     _boneLines = new ImmediateMesh();
@@ -121,11 +114,14 @@ public partial class A6_Project : Node3D
 
     private void DrawImGui()
     {
-        if (!ImGui.Begin("Skeleton Joints")) return;
+        UpdateImGuiScale();
 
-        DrawJointRecursive(_skeleton.Root);
+        if (ImGui.Begin("Skeleton Joints"))
+        {
+            DrawJointRecursive(_skeleton.Root);
+            ImGui.End();
+        }
 
-        ImGui.End();
     }
 
 
@@ -139,18 +135,19 @@ public partial class A6_Project : Node3D
         PrimitiveMesh mesh;
 
         string name = joint.Name.ToLowerInvariant();
-
+        
         // HEAD
         if (name.Contains("head"))
         {
             mesh = new SphereMesh
             {
-                Radius = 0.25f,
-                Height = 0.25f,
+                Radius = 0.15f,
+                Height = 0.25f, // let it be taller
                 RadialSegments = 12,
                 Rings = 6
             };
         }
+
         // NECK or joints connecting to head
         else if (name.Contains("neck"))
         {
@@ -214,17 +211,7 @@ public partial class A6_Project : Node3D
                 Size = new Vector3(0.1f, 0.05f, 0.1f)
             };
         }
-        // FINGERS / THUMBS
-        else if (name.Contains("finger") || name.Contains("thumb"))
-        {
-            mesh = new CapsuleMesh
-            {
-                Radius = 0.025f,
-                Height = 0.07f,
-                RadialSegments = 6,
-                Rings = 2
-            };
-        }
+     
         // Fallback
         else
         {
@@ -251,7 +238,7 @@ public partial class A6_Project : Node3D
     
 private Color GetColorForJoint(string name)
 {
-    if (name.Contains("head") || name.Contains("hand") || name.Contains("finger") || name.Contains("thumb"))
+    if (name.Contains("head") || name.Contains("hand"))
         return new Color(1f, 0.8f, 0.6f); // Skin tone
 
     if (name.Contains("torso")) return new Color(0.2f, 0.6f, 1f);         // Shirt
@@ -260,6 +247,26 @@ private Color GetColorForJoint(string name)
     if (name.Contains("arm") || name.Contains("shoulder") || name.Contains("elbow")) return new Color(1f, 0.8f, 0.6f); // Arms
 
     return new Color(1, 1, 1); // fallback white
+}
+
+
+private Vector2 _lastViewportSize = Vector2.Zero;
+
+private void UpdateImGuiScale()
+{
+    var size = GetViewport().GetVisibleRect().Size;
+
+    if (size == _lastViewportSize)
+        return;
+
+    _lastViewportSize = size;
+
+    float scaleX = size.X / BaseWidth;
+    float scaleY = size.Y / BaseHeight;
+    float uiScale = Mathf.Clamp(Mathf.Min(scaleX, scaleY), 0.6f, 2.0f);
+
+    ImGui.GetIO().FontGlobalScale = uiScale;
+    ImGui.GetStyle().ScaleAllSizes(uiScale);
 }
 
 
@@ -332,6 +339,27 @@ private Color GetColorForJoint(string name)
         }
 
         ImGui.PopID();
+    }
+
+    private void ApplyAPose()
+    {
+        // Position Adjustments (from your notes)
+        _skeleton.Find("Head")!.LocalPosition = new Vector3(0, 0.14f, 0);
+        _skeleton.Find("Neck")!.LocalPosition = new Vector3(0, 0.220f, 0);
+        _skeleton.Find("LeftShoulder")!.LocalPosition = new Vector3(-0.15f, 0.16f, 0);
+        _skeleton.Find("RightShoulder")!.LocalPosition = new Vector3(0.15f, 0.16f, 0);
+
+        // Left Arm Rotations
+        _skeleton.Find("LeftShoulder")!.LocalRotation = new Vector3(0, 0, 25);
+        _skeleton.Find("LeftElbow")!.LocalRotation = new Vector3(0, 0, 10);
+        _skeleton.Find("LeftWrist")!.LocalRotation = new Vector3(0, 0, 5);
+        _skeleton.Find("LeftHand")!.LocalRotation = new Vector3(0, 0, 5);
+
+        // Right Arm Rotations
+        _skeleton.Find("RightShoulder")!.LocalRotation = new Vector3(0, 0, -25);
+        _skeleton.Find("RightElbow")!.LocalRotation = new Vector3(0, 0, -10);
+        _skeleton.Find("RightWrist")!.LocalRotation = new Vector3(0, 0, -5);
+        _skeleton.Find("RightHand")!.LocalRotation = new Vector3(0, 0, -5);
     }
 
 
