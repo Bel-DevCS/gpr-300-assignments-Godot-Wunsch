@@ -12,12 +12,12 @@ public partial class CustomMeshObject : Node
 
     private List<ControlPoint> _points = new();
     private float _thickness = 0.1f;
-    private bool _editingMode = true;
+    public bool _editingMode = true;
     private List<MeshInstance3D> _debugSpheres = new();
     private Gizmo3DPlugin.Gizmo3D _gizmo = new();
     private int _selectedPointIndex = -1;
 
-    private Stack<PointEdit> _undoStack = new();
+    public Stack<PointEdit> _undoStack = new();
     private Stack<PointEdit> _redoStack = new();
     private Vector3 _dragStartPos;
     private const int MAX_HISTORY = 100;
@@ -32,9 +32,18 @@ public partial class CustomMeshObject : Node
     private float _inspectorEditCooldown = 0f;
 
     private int _runtimeUndoBaseline = 0;
-
     
-    private struct ControlPoint
+    public List<ControlPoint> Points => _points;
+    public List<MeshInstance3D> DebugSpheres => _debugSpheres;
+
+    public int SelectedPointIndex { get => _selectedPointIndex; set => _selectedPointIndex = value; }
+    public int PendingReorderFrom { get => _pendingReorderFrom; set => _pendingReorderFrom = value; }
+    public int PendingReorderTo { get => _pendingReorderTo; set => _pendingReorderTo = value; }
+    
+    private CustomMeshObject_UI _ui;
+    
+    
+    public  struct ControlPoint
     {
         public string Label;
         public Vector3 Position;
@@ -47,7 +56,7 @@ public partial class CustomMeshObject : Node
         }
     }
 
-    private enum EditAction
+    public enum EditAction
     {
         Move,
         Rotate,
@@ -57,7 +66,7 @@ public partial class CustomMeshObject : Node
         Clear
     }
 
-    private struct PointEdit
+    public struct PointEdit
     {
         public EditAction Action;
         public int Index;
@@ -80,168 +89,10 @@ public partial class CustomMeshObject : Node
         AddChild(_gizmo);
         _gizmo.Mode = Gizmo3D.ToolMode.Move;
         _runtimeUndoBaseline = _undoStack.Count;
+        
+        _ui = new CustomMeshObject_UI(this);
     }
     
-
-private void DrawPointListImGui()
-{
-    // Handle pending reorder BEFORE draw
-    if (_pendingReorderFrom >= 0 && _pendingReorderTo >= 0)
-    {
-        var movedPoint = _points[_pendingReorderFrom];
-        var movedSphere = _debugSpheres[_pendingReorderFrom];
-
-        _points.RemoveAt(_pendingReorderFrom);
-        _debugSpheres.RemoveAt(_pendingReorderFrom);
-
-        int insertAt = _pendingReorderTo;
-        if (_pendingReorderFrom < _pendingReorderTo)
-            insertAt--;
-
-        _points.Insert(insertAt, movedPoint);
-        _debugSpheres.Insert(insertAt, movedSphere);
-
-        _pendingReorderFrom = -1;
-        _pendingReorderTo = -1;
-
-        _selectedPointIndex = -1; // reset selection on reorder
-        GenerateMeshFromPoints();
-    }
-
-    if (_selectedPointIndex >= _points.Count)
-        _selectedPointIndex = -1;
-
-    for (int i = 0; i < _points.Count; i++)
-    {
-        ImGui.PushID(i);
-        ImGui.BeginGroup();
-
-        try
-        {
-            // Drag handle
-            ImGui.PushStyleColor(ImGuiCol.Button, new System.Numerics.Vector4(0, 0, 0, 0)); // Transparent
-            ImGui.Button("≡");
-            ImGui.PopStyleColor();
-
-            if (ImGui.BeginDragDropSource())
-            {
-                ImGui.SetDragDropPayload("POINT_DRAG", IntPtr.Zero, 0);
-                _dragIndex = i;
-                ImGui.Text($"Moving: {_points[i].Label ?? $"Point {i}"}");
-                ImGui.EndDragDropSource();
-            }
-
-            ImGui.SameLine();
-
-            // Selectable point name
-            if (ImGui.Selectable(_points[i].Label ?? $"Point {i}", _selectedPointIndex == i))
-            {
-                SelectPoint(i);
-            }
-
-
-            // Label editing
-            string label = _points[i].Label ?? $"Point {i}";
-            byte[] buffer = new byte[64];
-            var encoded = Encoding.UTF8.GetBytes(label);
-            Array.Copy(encoded, buffer, encoded.Length);
-
-            if (ImGui.InputText($"##label_{i}", buffer, (uint)buffer.Length))
-            {
-                var cp = _points[i];
-                cp.Label = Encoding.UTF8.GetString(buffer).TrimEnd('\0');
-                _points[i] = cp;
-            }
-
-            // Drop target
-            if (ImGui.BeginDragDropTarget())
-            {
-                unsafe
-                {
-                    if (ImGui.AcceptDragDropPayload("POINT_DRAG").NativePtr != null && _dragIndex >= 0 && _dragIndex != i)
-                    {
-                        _pendingReorderFrom = _dragIndex;
-                        _pendingReorderTo = i;
-                    }
-                }
-                ImGui.EndDragDropTarget();
-            }
-        }
-        
-        finally
-        {
-            ImGui.EndGroup();
-            ImGui.Separator();
-            ImGui.PopID();
-        }
-    }
-}
-
-private void DrawPointInspectorImGui()
-{
-    if (_selectedPointIndex < 0 || _selectedPointIndex >= _points.Count)
-        return;
-
-    if (ImGui.Begin("Selected Point"))
-    {
-        var cp = _points[_selectedPointIndex];
-
-        // Start of edit session: store snapshot
-        if (_preImGuiEditSnapshot == null && ImGui.IsMouseDown(0))
-            _preImGuiEditSnapshot = cp;
-
-        bool changed = false;
-
-        // Label edit
-        string currentLabel = cp.Label ?? $"Point {_selectedPointIndex}";
-        byte[] labelBuffer = new byte[64];
-        var encoded = Encoding.UTF8.GetBytes(currentLabel);
-        Array.Copy(encoded, labelBuffer, encoded.Length);
-
-        if (ImGui.InputText("Label", labelBuffer, (uint)labelBuffer.Length))
-        {
-            cp.Label = Encoding.UTF8.GetString(labelBuffer).TrimEnd('\0');
-            changed = true;
-        }
-
-        // Position edit
-        var pos = new System.Numerics.Vector3(cp.Position.X, cp.Position.Y, cp.Position.Z);
-        if (ImGui.DragFloat3("Position", ref pos, 0.01f))
-        {
-            cp.Position = new Vector3(pos.X, pos.Y, pos.Z);
-            UpdateDebugSphere(_selectedPointIndex);
-            changed = true;
-        }
-
-        // Apply live update
-        if (changed)
-        {
-            _points[_selectedPointIndex] = cp;
-            _editingInInspector = true; // locks out gizmo sync
-        }
-
-        // End of editing session: mouse released
-        if (_editingInInspector && !ImGui.IsMouseDown(0))
-        {
-            _editingInInspector = false;
-
-            if (_preImGuiEditSnapshot != null)
-            {
-                PushUndo(new PointEdit
-                {
-                    Action = EditAction.Move,
-                    Index = _selectedPointIndex,
-                    State = _preImGuiEditSnapshot.Value
-                });
-
-                _preImGuiEditSnapshot = null;
-            }
-        }
-    }
-
-    ImGui.End();
-}
-
 
     public override void _Process(double delta)
     {
@@ -249,10 +100,8 @@ private void DrawPointInspectorImGui()
             UpdatePointsFromDebugSpheres();
 
         GenerateMeshFromPoints();
-        DrawImGuiEditor();
+        _ui.DrawEditor();
     }
-
-    
     private void UpdatePointsFromDebugSpheres()
     {
         for (int i = 0; i < _debugSpheres.Count; i++)
@@ -271,8 +120,6 @@ private void DrawPointInspectorImGui()
             };
         }
     }
-
-
     public override void _UnhandledInput(InputEvent @event)
     {
         if (!_editingMode) return;
@@ -338,7 +185,6 @@ private void DrawPointInspectorImGui()
             }
         }
     }
-
     private void TrySelectSphere(Vector2 mousePos)
     {
         var camera = GetViewport().GetCamera3D();
@@ -368,7 +214,6 @@ private void DrawPointInspectorImGui()
             }
         }
     }
-
     private void AttachGizmoToSelected()
     {
         for (int i = 0; i < _debugSpheres.Count; i++)
@@ -384,7 +229,6 @@ private void DrawPointInspectorImGui()
             _gizmo.Select(sphere);
         }
     }
-
     private void DeselectSphere()
     {
         foreach (var sphere in _debugSpheres)
@@ -400,7 +244,6 @@ private void DrawPointInspectorImGui()
 
         _selectedPointIndex = -1;
     }
-
     private Vector3 GetScaleFromBasis(Basis basis)
     {
         return new Vector3(
@@ -409,8 +252,7 @@ private void DrawPointInspectorImGui()
             basis.Z.Length()
         );
     }
-
-    private void GenerateMeshFromPoints()
+    public void GenerateMeshFromPoints()
     {
         _mesh.ClearSurfaces();
         _mesh.SurfaceBegin(Mesh.PrimitiveType.Triangles);
@@ -463,50 +305,6 @@ private void DrawPointInspectorImGui()
 
         _mesh.SurfaceEnd();
     }
-
-
-    private void DrawImGuiEditor()
-    {
-        if (Engine.IsEditorHint()) return;
-
-        // First window: main editor
-        if (ImGui.Begin("Custom Mesh Editor"))
-        {
-            if (ImGui.Button("Add Point"))
-            {
-                Vector3 newPoint = _points.Count > 0 ? _points[^1].Position + new Vector3(0.5f, 0, 0) : Vector3.Zero;
-                AddPoint(newPoint);
-            }
-
-            if (ImGui.Button("Delete Point"))
-                DeleteSelectedPoint();
-
-            if (ImGui.Button("Clear Points"))
-                ClearPoints();
-
-            ImGui.SliderFloat("Thickness", ref _thickness, 0.01f, 0.5f);
-
-            if (ImGui.Checkbox("Editing Mode", ref _editingMode))
-            {
-                ClearDebugSpheres();
-                if (_editingMode)
-                {
-                    foreach (var cp in _points)
-                        SpawnDebugSphere(cp.Position);
-                }
-            }
-
-            ImGui.Separator();
-            ImGui.Text("Point Order & Labels:");
-            DrawPointListImGui();
-        }
-        ImGui.End();
-
-        // Separate window: Inspector
-        DrawPointInspectorImGui();
-    }
-
-
     private void AddPoint(Vector3 point)
     {
         var cp = new ControlPoint
@@ -528,7 +326,6 @@ private void DrawPointInspectorImGui()
         _redoStack.Clear();
         if (_editingMode) SpawnDebugSphere(point);
     }
-    
     private void DeleteSelectedPoint()
     {
         if (_selectedPointIndex < 0 || _selectedPointIndex >= _points.Count)
@@ -559,13 +356,11 @@ private void DrawPointInspectorImGui()
 
         GenerateMeshFromPoints();
     }
-
     private void ClearPoints()
     {
         _points.Clear();
         ClearDebugSpheres();
     }
-
     private void ClearDebugSpheres()
     {
         foreach (var sphere in _debugSpheres)
@@ -573,7 +368,6 @@ private void DrawPointInspectorImGui()
                 sphere.QueueFree();
         _debugSpheres.Clear();
     }
-
     private MeshInstance3D SpawnDebugSphere(Vector3 position)
     {
         var sphere = new MeshInstance3D
@@ -593,8 +387,6 @@ private void DrawPointInspectorImGui()
         _debugSpheres.Add(sphere);
         return sphere;
     }
-
-    
     public void Undo()
     {
         if (_undoStack.Count <= _runtimeUndoBaseline)
@@ -633,9 +425,6 @@ private void DrawPointInspectorImGui()
 
         GenerateMeshFromPoints();
     }
-
-
-
     public void Redo()
     {
         if (_redoStack.Count == 0) return;
@@ -686,23 +475,18 @@ private void DrawPointInspectorImGui()
 
         GenerateMeshFromPoints();
     }
-
-
-
-    private void UpdateDebugSphere(int index)
+    public void UpdateDebugSphere(int index)
     {
         if (_editingMode && index >= 0 && index < _debugSpheres.Count)
             _debugSpheres[index].GlobalTransform = _points[index].ToTransform();
     }
-    
-    private void PushUndo(PointEdit edit)
+    public void PushUndo(PointEdit edit)
     {
         _undoStack.Push(edit);
         if (_undoStack.Count > MAX_HISTORY)
             _undoStack = new Stack<PointEdit>(_undoStack.ToArray()[..MAX_HISTORY]); 
     }
-
-    private void SelectPoint(int index)
+    public void SelectPoint(int index)
     {
         if (index < 0 || index >= _points.Count || index >= _debugSpheres.Count)
             return;
@@ -712,7 +496,34 @@ private void DrawPointInspectorImGui()
         AttachGizmoToSelected();
         _dragStartPos = _points[index].Position;
     }
+    
+    public void OnAddPointClicked()
+    {
+        Vector3 newPoint = _points.Count > 0 ? _points[^1].Position + new Vector3(0.5f, 0, 0) : Vector3.Zero;
+        AddPoint(newPoint);
+    }
 
+    public void OnDeletePointClicked()
+    {
+        DeleteSelectedPoint();
+    }
 
+    public void OnClearPointsClicked()
+    {
+        ClearPoints();
+    }
+
+    public void OnToggleEditingMode()
+    {
+        ClearDebugSpheres();
+
+        if (_editingMode)
+        {
+            foreach (var cp in _points)
+                SpawnDebugSphere(cp.Position);
+        }
+    }
+
+    
     private bool IsInstanceValid(Node node) => node != null && node.IsInsideTree();
 }
