@@ -29,6 +29,8 @@ public partial class CustomMeshObject : Node
     private enum EditAction
     {
         Move,
+        Rotate,
+        Scale,
         Add,
         Remove,
         Clear
@@ -106,20 +108,29 @@ public partial class CustomMeshObject : Node
             else if (!mouseBtn.Pressed && mouseBtn.ButtonIndex == MouseButton.Left && _selectedPointIndex != -1)
             {
                 Vector3 newPos = _points[_selectedPointIndex];
+
                 if (_dragStartPos.DistanceSquaredTo(newPos) > 0.0001f)
                 {
+                    var action = _gizmo.Mode switch
+                    {
+                        Gizmo3D.ToolMode.Move => EditAction.Move,
+                        Gizmo3D.ToolMode.Rotate => EditAction.Rotate,
+                        Gizmo3D.ToolMode.Scale => EditAction.Scale,
+                        _ => EditAction.Move
+                    };
+
                     _undoStack.Push(new PointEdit
                     {
-                        Action = EditAction.Move,
+                        Action = action,
                         Index = _selectedPointIndex,
                         Position = _dragStartPos
                     });
-                    _redoStack.Clear();
 
-                    //Update drag start for next round
+                    _redoStack.Clear();
                     _dragStartPos = newPos;
                 }
             }
+
 
 
         }
@@ -391,7 +402,7 @@ public partial class CustomMeshObject : Node
 
     private PointEdit GetInverseEdit(PointEdit edit)
     {
-        if (edit.Action == EditAction.Move)
+        if (edit.Action == EditAction.Move || edit.Action == EditAction.Rotate || edit.Action == EditAction.Scale)
         {
             if (edit.Index < 0 || edit.Index >= _points.Count)
             {
@@ -401,19 +412,30 @@ public partial class CustomMeshObject : Node
 
             return new PointEdit
             {
-                Action = EditAction.Move,
+                Action = edit.Action, // keep same action type
                 Index = edit.Index,
-                Position = _points[edit.Index]
+                Position = _points[edit.Index] // current position becomes "redo"
             };
         }
-        
+
         return edit.Action switch
         {
-            EditAction.Add => new PointEdit { Action = EditAction.Remove, Index = edit.Index, Position = _points[Math.Min(edit.Index, _points.Count - 1)] },
-            EditAction.Remove => new PointEdit { Action = EditAction.Add, Index = edit.Index, Position = edit.Position },
+            EditAction.Add => new PointEdit
+            {
+                Action = EditAction.Remove,
+                Index = edit.Index,
+                Position = _points[Math.Min(edit.Index, _points.Count - 1)]
+            },
+            EditAction.Remove => new PointEdit
+            {
+                Action = EditAction.Add,
+                Index = edit.Index,
+                Position = edit.Position
+            },
             _ => edit
         };
     }
+
 
 
 
@@ -474,6 +496,8 @@ public partial class CustomMeshObject : Node
         switch (edit.Action)
         {
             case EditAction.Move:
+            case EditAction.Rotate:
+            case EditAction.Scale:
                 ApplyPosition(edit.Index, edit.Position);
                 break;
 
@@ -488,7 +512,7 @@ public partial class CustomMeshObject : Node
                 break;
         }
 
-        // Refresh selection visual if point index matches selected
+        // Refresh selection visuals
         if (_selectedPointIndex == edit.Index)
         {
             DeselectSphere();
