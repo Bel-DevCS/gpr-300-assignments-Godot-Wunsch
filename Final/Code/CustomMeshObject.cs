@@ -76,38 +76,13 @@ public partial class CustomMeshObject : Node
 
     public override void _Process(double delta)
     {
-        if (_editingMode)
-        {
-            for (int i = 0; i < _debugSpheres.Count; i++)
-            {
-                Vector3 pos = _debugSpheres[i].GlobalTransform.Origin;
-                if (_points[i] != pos)
-                {
-                    _undoStack.Push(new PointEdit { Action = EditAction.Add, Index = _points.Count });
-                    _points[i] = pos;
-                    _curve.SetPointPosition(i, pos);
-                }
-            }
-        }
-        
         for (int i = 0; i < _debugSpheres.Count; i++)
         {
             Vector3 currentPos = _debugSpheres[i].GlobalTransform.Origin;
-
-            if (_points[i] != currentPos)
-            {
-                _undoStack.Push(new PointEdit
-                {
-                    Action = EditAction.Move,
-                    Index = i,
-                    Position = _points[i]
-                });
-                _redoStack.Clear();                // Clear redo
-                _points[i] = currentPos;
-                _curve.SetPointPosition(i, currentPos);
-            }
+            _points[i] = currentPos;
+            _curve.SetPointPosition(i, currentPos);
         }
-
+        
 
         GenerateMeshFromCurve();
         DrawImGuiEditor();
@@ -139,9 +114,14 @@ public partial class CustomMeshObject : Node
                         Index = _selectedPointIndex,
                         Position = _dragStartPos
                     });
-                    _redoStack.Clear(); // Invalidate redo
+                    _redoStack.Clear();
+
+                    //Update drag start for next round
+                    _dragStartPos = newPos;
                 }
             }
+
+
         }
 
         // Keyboard shortcuts
@@ -337,6 +317,7 @@ public partial class CustomMeshObject : Node
         {
             if (collider.IsAncestorOf(_debugSpheres[i]) || _debugSpheres[i].IsAncestorOf(collider))
             {
+                DeselectSphere();
                 _selectedPointIndex = i;
                 AttachGizmoToSelected();
                 _dragStartPos = _points[_selectedPointIndex];
