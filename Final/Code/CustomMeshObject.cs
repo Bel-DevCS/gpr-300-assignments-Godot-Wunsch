@@ -25,7 +25,15 @@ public partial class CustomMeshObject : Node
     
     private int _pendingReorderFrom = -1;
     private int _pendingReorderTo = -1;
+    
+    private ControlPoint? _preImGuiEditSnapshot = null;
+    
+    private bool _editingInInspector = false;
+    private float _inspectorEditCooldown = 0f;
 
+    private int _runtimeUndoBaseline = 0;
+
+    
     private struct ControlPoint
     {
         public string Label;
@@ -71,6 +79,7 @@ public partial class CustomMeshObject : Node
 
         AddChild(_gizmo);
         _gizmo.Mode = Gizmo3D.ToolMode.Move;
+        _runtimeUndoBaseline = _undoStack.Count;
     }
     
 
@@ -158,6 +167,7 @@ private void DrawPointListImGui()
                 ImGui.EndDragDropTarget();
             }
         }
+        
         finally
         {
             ImGui.EndGroup();
@@ -176,6 +186,12 @@ private void DrawPointInspectorImGui()
     {
         var cp = _points[_selectedPointIndex];
 
+        // Start of edit session: store snapshot
+        if (_preImGuiEditSnapshot == null && ImGui.IsMouseDown(0))
+            _preImGuiEditSnapshot = cp;
+
+        bool changed = false;
+
         // Label edit
         string currentLabel = cp.Label ?? $"Point {_selectedPointIndex}";
         byte[] labelBuffer = new byte[64];
@@ -185,7 +201,7 @@ private void DrawPointInspectorImGui()
         if (ImGui.InputText("Label", labelBuffer, (uint)labelBuffer.Length))
         {
             cp.Label = Encoding.UTF8.GetString(labelBuffer).TrimEnd('\0');
-            _points[_selectedPointIndex] = cp;
+            changed = true;
         }
 
         // Position edit
@@ -193,21 +209,49 @@ private void DrawPointInspectorImGui()
         if (ImGui.DragFloat3("Position", ref pos, 0.01f))
         {
             cp.Position = new Vector3(pos.X, pos.Y, pos.Z);
-            _points[_selectedPointIndex] = cp;
             UpdateDebugSphere(_selectedPointIndex);
+            changed = true;
+        }
+
+        // Apply live update
+        if (changed)
+        {
+            _points[_selectedPointIndex] = cp;
+            _editingInInspector = true; // locks out gizmo sync
+        }
+
+        // End of editing session: mouse released
+        if (_editingInInspector && !ImGui.IsMouseDown(0))
+        {
+            _editingInInspector = false;
+
+            if (_preImGuiEditSnapshot != null)
+            {
+                PushUndo(new PointEdit
+                {
+                    Action = EditAction.Move,
+                    Index = _selectedPointIndex,
+                    State = _preImGuiEditSnapshot.Value
+                });
+
+                _preImGuiEditSnapshot = null;
+            }
         }
     }
 
     ImGui.End();
 }
 
+
     public override void _Process(double delta)
     {
-        UpdatePointsFromDebugSpheres();
+        if (!_editingInInspector)
+            UpdatePointsFromDebugSpheres();
+
         GenerateMeshFromPoints();
-        
         DrawImGuiEditor();
     }
+
     
     private void UpdatePointsFromDebugSpheres()
     {
@@ -553,20 +597,16 @@ private void DrawPointInspectorImGui()
     
     public void Undo()
     {
-        if (_undoStack.Count == 0) return;
-        var edit = _undoStack.Pop();
+        if (_undoStack.Count <= _runtimeUndoBaseline)
+            return; // Don't undo past runtime baseline
 
-        // Save current for Redo
+        var edit = _undoStack.Pop();
+    
+        // Save for redo
         if (edit.Action == EditAction.Remove)
         {
             _points.Insert(edit.Index, edit.State);
-            _redoStack.Push(new PointEdit
-            {
-                Action = EditAction.Add,
-                Index = edit.Index,
-                State = edit.State
-            });
-
+            _redoStack.Push(new PointEdit { Action = EditAction.Add, Index = edit.Index, State = edit.State });
             if (_editingMode)
                 _debugSpheres.Insert(edit.Index, SpawnDebugSphere(edit.State.Position));
         }
@@ -574,13 +614,7 @@ private void DrawPointInspectorImGui()
         {
             if (edit.Index >= 0 && edit.Index < _points.Count)
             {
-                _redoStack.Push(new PointEdit
-                {
-                    Action = EditAction.Remove,
-                    Index = edit.Index,
-                    State = _points[edit.Index]
-                });
-
+                _redoStack.Push(new PointEdit { Action = EditAction.Remove, Index = edit.Index, State = _points[edit.Index] });
                 _points.RemoveAt(edit.Index);
                 if (_editingMode && edit.Index < _debugSpheres.Count)
                 {
@@ -599,6 +633,7 @@ private void DrawPointInspectorImGui()
 
         GenerateMeshFromPoints();
     }
+
 
 
     public void Redo()
