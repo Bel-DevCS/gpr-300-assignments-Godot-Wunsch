@@ -76,65 +76,7 @@ public partial class CustomMeshObject : Node
 
 private void DrawPointListImGui()
 {
-    for (int i = 0; i < _points.Count; i++)
-    {
-        ImGui.PushID(i);
-        ImGui.BeginGroup();
-
-        // Drag Handle
-        ImGui.PushStyleColor(ImGuiCol.Button, new System.Numerics.Vector4(0, 0, 0, 0)); // Transparent
-        ImGui.Button("≡");
-        ImGui.PopStyleColor();
-
-        if (ImGui.BeginDragDropSource())
-        {
-            ImGui.SetDragDropPayload("POINT_DRAG", IntPtr.Zero, 0);
-            _dragIndex = i;
-            ImGui.Text($"Moving: {_points[i].Label ?? $"Point {i}"}");
-            ImGui.EndDragDropSource();
-        }
-
-        ImGui.SameLine();
-
-        // Selectable
-        if (ImGui.Selectable(_points[i].Label ?? $"Point {i}", _selectedPointIndex == i))
-        {
-            _selectedPointIndex = i;
-        }
-
-        // Rename field
-        string label = _points[i].Label ?? $"Point {i}";
-        byte[] buffer = new byte[64];
-        var encoded = Encoding.UTF8.GetBytes(label);
-        Array.Copy(encoded, buffer, encoded.Length);
-
-        if (ImGui.InputText($"##label_{i}", buffer, (uint)buffer.Length))
-        {
-            var cp = _points[i];
-            cp.Label = Encoding.UTF8.GetString(buffer).TrimEnd('\0');
-            _points[i] = cp;
-        }
-
-        // Drag-and-drop target
-        if (ImGui.BeginDragDropTarget())
-        {
-            unsafe
-            {
-                if (ImGui.AcceptDragDropPayload("POINT_DRAG").NativePtr != null && _dragIndex >= 0 && _dragIndex != i)
-                {
-                    _pendingReorderFrom = _dragIndex;
-                    _pendingReorderTo = i;
-                }
-                ImGui.EndDragDropTarget();
-            }
-        }
-
-        ImGui.EndGroup();
-        ImGui.Separator();
-        ImGui.PopID();
-    }
-
-    // Reorder handling AFTER iteration
+    // Handle pending reorder BEFORE draw
     if (_pendingReorderFrom >= 0 && _pendingReorderTo >= 0)
     {
         var movedPoint = _points[_pendingReorderFrom];
@@ -153,13 +95,111 @@ private void DrawPointListImGui()
         _pendingReorderFrom = -1;
         _pendingReorderTo = -1;
 
+        _selectedPointIndex = -1; // reset selection on reorder
         GenerateMeshFromPoints();
     }
 
+    if (_selectedPointIndex >= _points.Count)
+        _selectedPointIndex = -1;
+
+    for (int i = 0; i < _points.Count; i++)
+    {
+        ImGui.PushID(i);
+        ImGui.BeginGroup();
+
+        try
+        {
+            // Drag handle
+            ImGui.PushStyleColor(ImGuiCol.Button, new System.Numerics.Vector4(0, 0, 0, 0)); // Transparent
+            ImGui.Button("≡");
+            ImGui.PopStyleColor();
+
+            if (ImGui.BeginDragDropSource())
+            {
+                ImGui.SetDragDropPayload("POINT_DRAG", IntPtr.Zero, 0);
+                _dragIndex = i;
+                ImGui.Text($"Moving: {_points[i].Label ?? $"Point {i}"}");
+                ImGui.EndDragDropSource();
+            }
+
+            ImGui.SameLine();
+
+            // Selectable point name
+            if (ImGui.Selectable(_points[i].Label ?? $"Point {i}", _selectedPointIndex == i))
+            {
+                SelectPoint(i);
+            }
+
+
+            // Label editing
+            string label = _points[i].Label ?? $"Point {i}";
+            byte[] buffer = new byte[64];
+            var encoded = Encoding.UTF8.GetBytes(label);
+            Array.Copy(encoded, buffer, encoded.Length);
+
+            if (ImGui.InputText($"##label_{i}", buffer, (uint)buffer.Length))
+            {
+                var cp = _points[i];
+                cp.Label = Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+                _points[i] = cp;
+            }
+
+            // Drop target
+            if (ImGui.BeginDragDropTarget())
+            {
+                unsafe
+                {
+                    if (ImGui.AcceptDragDropPayload("POINT_DRAG").NativePtr != null && _dragIndex >= 0 && _dragIndex != i)
+                    {
+                        _pendingReorderFrom = _dragIndex;
+                        _pendingReorderTo = i;
+                    }
+                }
+                ImGui.EndDragDropTarget();
+            }
+        }
+        finally
+        {
+            ImGui.EndGroup();
+            ImGui.Separator();
+            ImGui.PopID();
+        }
+    }
 }
 
+private void DrawPointInspectorImGui()
+{
+    if (_selectedPointIndex < 0 || _selectedPointIndex >= _points.Count)
+        return;
 
+    if (ImGui.Begin("Selected Point"))
+    {
+        var cp = _points[_selectedPointIndex];
 
+        // Label edit
+        string currentLabel = cp.Label ?? $"Point {_selectedPointIndex}";
+        byte[] labelBuffer = new byte[64];
+        var encoded = Encoding.UTF8.GetBytes(currentLabel);
+        Array.Copy(encoded, labelBuffer, encoded.Length);
+
+        if (ImGui.InputText("Label", labelBuffer, (uint)labelBuffer.Length))
+        {
+            cp.Label = Encoding.UTF8.GetString(labelBuffer).TrimEnd('\0');
+            _points[_selectedPointIndex] = cp;
+        }
+
+        // Position edit
+        var pos = new System.Numerics.Vector3(cp.Position.X, cp.Position.Y, cp.Position.Z);
+        if (ImGui.DragFloat3("Position", ref pos, 0.01f))
+        {
+            cp.Position = new Vector3(pos.X, pos.Y, pos.Z);
+            _points[_selectedPointIndex] = cp;
+            UpdateDebugSphere(_selectedPointIndex);
+        }
+    }
+
+    ImGui.End();
+}
 
     public override void _Process(double delta)
     {
@@ -385,6 +425,7 @@ private void DrawPointListImGui()
     {
         if (Engine.IsEditorHint()) return;
 
+        // First window: main editor
         if (ImGui.Begin("Custom Mesh Editor"))
         {
             if (ImGui.Button("Add Point"))
@@ -394,14 +435,10 @@ private void DrawPointListImGui()
             }
 
             if (ImGui.Button("Delete Point"))
-            {
                 DeleteSelectedPoint();
-            }
 
             if (ImGui.Button("Clear Points"))
-            {
                 ClearPoints();
-            }
 
             ImGui.SliderFloat("Thickness", ref _thickness, 0.01f, 0.5f);
 
@@ -420,7 +457,11 @@ private void DrawPointListImGui()
             DrawPointListImGui();
         }
         ImGui.End();
+
+        // Separate window: Inspector
+        DrawPointInspectorImGui();
     }
+
 
     private void AddPoint(Vector3 point)
     {
@@ -624,6 +665,17 @@ private void DrawPointListImGui()
         _undoStack.Push(edit);
         if (_undoStack.Count > MAX_HISTORY)
             _undoStack = new Stack<PointEdit>(_undoStack.ToArray()[..MAX_HISTORY]); 
+    }
+
+    private void SelectPoint(int index)
+    {
+        if (index < 0 || index >= _points.Count || index >= _debugSpheres.Count)
+            return;
+
+        DeselectSphere();
+        _selectedPointIndex = index;
+        AttachGizmoToSelected();
+        _dragStartPos = _points[index].Position;
     }
 
 
