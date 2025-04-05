@@ -1,31 +1,40 @@
 using Godot;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using Gizmo3DPlugin;
+using ImGuiNET;
 
 public partial class CustomMeshObject : Node
 {
     private ImmediateMesh _mesh = new ImmediateMesh();
     private MeshInstance3D _meshInstance;
 
-    private Curve3D _curve = new Curve3D();
-    private List<Vector3> _points = new List<Vector3>();
+    private List<ControlPoint> _points = new();
 
     private float _thickness = 0.1f;
-    
     private bool _editingMode = true;
     private List<MeshInstance3D> _debugSpheres = new();
-    
     private Gizmo3DPlugin.Gizmo3D _gizmo = new();
     private int _selectedPointIndex = -1;
-    
+
     private Stack<PointEdit> _undoStack = new();
     private Stack<PointEdit> _redoStack = new();
-    
     private Vector3 _dragStartPos;
-
     
+    private const int MAX_HISTORY = 100;
+
+    private struct ControlPoint
+    {
+        public Vector3 Position;
+        public Basis Rotation;
+        public Vector3 Scale;
+
+        public Transform3D ToTransform()
+        {
+            return new Transform3D(Rotation.Scaled(Scale), Position);
+        }
+    }
+
     private enum EditAction
     {
         Move,
@@ -40,37 +49,21 @@ public partial class CustomMeshObject : Node
     {
         public EditAction Action;
         public int Index;
-        public Vector3 Position;
+        public ControlPoint State;
     }
-    
+
 
     public override void _Ready()
     {
         _meshInstance = new MeshInstance3D();
         _meshInstance.Mesh = _mesh;
-
-        var mat = new StandardMaterial3D();
-        mat.AlbedoColor = Colors.Blue;
-        mat.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
-        mat.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        var mat = new StandardMaterial3D { AlbedoColor = Colors.Blue, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
         _meshInstance.MaterialOverride = mat;
-
         AddChild(_meshInstance);
 
         AddPoint(new Vector3(0, 0, 0));
         AddPoint(new Vector3(1, 0, 0));
         AddPoint(new Vector3(2, 0, 1));
-
-        for (int i = 0; i < _points.Count; i++)
-        {
-            _undoStack.Push(new PointEdit
-            {
-                Action = EditAction.Move,
-                Index = i,
-                Position = _points[i]
-            });
-        }
-
 
         AddChild(_gizmo);
         _gizmo.Mode = Gizmo3D.ToolMode.Move;
@@ -78,36 +71,40 @@ public partial class CustomMeshObject : Node
 
     public override void _Process(double delta)
     {
+        UpdatePointsFromDebugSpheres();
+        GenerateMeshFromPoints();
+        
+        DrawImGuiEditor();
+    }
+    
+    private void UpdatePointsFromDebugSpheres()
+    {
         for (int i = 0; i < _debugSpheres.Count; i++)
         {
-            Vector3 currentPos = _debugSpheres[i].GlobalTransform.Origin;
-            _points[i] = currentPos;
-            _curve.SetPointPosition(i, currentPos);
+            Transform3D xform = _debugSpheres[i].GlobalTransform;
+            if (i >= _points.Count) continue; // avoid out of bounds
+            _points[i] = new ControlPoint
+            {
+                Position = xform.Origin,
+                Rotation = xform.Basis.Orthonormalized(),
+                Scale = GetScaleFromBasis(xform.Basis)
+            };
         }
-        
-
-        GenerateMeshFromCurve();
-        DrawImGuiEditor();
     }
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (!_editingMode)
-            return;
+        if (!_editingMode) return;
 
-        // Mouse selection
         if (@event is InputEventMouseButton mouseBtn)
         {
-            // Left Click Pressed → Try selecting a sphere
             if (mouseBtn.Pressed && mouseBtn.ButtonIndex == MouseButton.Left)
             {
                 TrySelectSphere(mouseBtn.Position);
             }
-
-            // Left Click Released → Check if moved and commit undo
             else if (!mouseBtn.Pressed && mouseBtn.ButtonIndex == MouseButton.Left && _selectedPointIndex != -1)
             {
-                Vector3 newPos = _points[_selectedPointIndex];
+                Vector3 newPos = _points[_selectedPointIndex].Position;
 
                 if (_dragStartPos.DistanceSquaredTo(newPos) > 0.0001f)
                 {
@@ -123,31 +120,23 @@ public partial class CustomMeshObject : Node
                     {
                         Action = action,
                         Index = _selectedPointIndex,
-                        Position = _dragStartPos
+                        State = _points[_selectedPointIndex]
                     });
 
                     _redoStack.Clear();
                     _dragStartPos = newPos;
                 }
             }
-
-
-
         }
 
-        // Keyboard shortcuts
         if (@event is InputEventKey key && key.Pressed)
         {
             bool ctrl = Input.IsKeyPressed(Key.Ctrl);
 
             if (ctrl && key.Keycode == Key.Z)
-            {
                 Undo();
-            }
             else if (ctrl && key.Keycode == Key.Y)
-            {
                 Redo();
-            }
             else if (!ctrl)
             {
                 switch (key.Keycode)
@@ -169,148 +158,10 @@ public partial class CustomMeshObject : Node
         }
     }
 
-
-    public void AddPoint(Vector3 point)
-    {
-        _points.Add(point);
-        _curve.AddPoint(point);
-        _undoStack.Push(new PointEdit { Action = EditAction.Add, Index = _points.Count - 1 });
-        _redoStack.Clear();
-
-        if (_editingMode)
-            SpawnDebugSphere(point);
-    }
-
-
-    public void ClearPoints()
-    {
-        for (int i = 0; i < _points.Count; i++)
-        {
-            _undoStack.Push(new PointEdit { Action = EditAction.Remove, Index = i, Position = _points[i] });
-        }
-
-        _redoStack.Clear();
-        _points.Clear();
-        _curve.ClearPoints();
-        ClearDebugSpheres();
-    }
-
-
-    private void GenerateMeshFromCurve()
-    {
-        if (_curve.PointCount < 2)
-            return;
-
-        _mesh.ClearSurfaces();
-        _mesh.SurfaceBegin(Mesh.PrimitiveType.Triangles);
-
-        for (int i = 0; i < _curve.PointCount - 1; i++)
-        {
-            Vector3 p0 = _curve.GetPointPosition(i);
-            Vector3 p1 = _curve.GetPointPosition(i + 1);
-            Vector3 dir = (p1 - p0).Normalized();
-            Vector3 right = dir.Cross(Vector3.Up).Normalized() * _thickness;
-
-            Vector3 v0 = p0 + right;
-            Vector3 v1 = p0 - right;
-            Vector3 v2 = p1 + right;
-            Vector3 v3 = p1 - right;
-
-            _mesh.SurfaceAddVertex(v0);
-            _mesh.SurfaceAddVertex(v1);
-            _mesh.SurfaceAddVertex(v2);
-
-            _mesh.SurfaceAddVertex(v1);
-            _mesh.SurfaceAddVertex(v3);
-            _mesh.SurfaceAddVertex(v2);
-        }
-
-        _mesh.SurfaceEnd();
-        _meshInstance.Mesh = _mesh;
-    }
-
-    public void DrawImGuiEditor()
-    {
-        if (Engine.IsEditorHint()) return;
-
-        if (ImGuiNET.ImGui.Begin("Custom Mesh Editor"))
-        {
-            if (ImGuiNET.ImGui.Button("Add Point"))
-            {
-                Vector3 newPoint = _points.Count > 0 ? _points[^1] + new Vector3(0.5f, 0, 0) : Vector3.Zero;
-                AddPoint(newPoint);
-            }
-
-            if (ImGuiNET.ImGui.Button("Clear Points"))
-            {
-                ClearPoints();
-            }
-
-            ImGuiNET.ImGui.SliderFloat("Thickness", ref _thickness, 0.01f, 0.5f);
-
-            if (ImGuiNET.ImGui.Checkbox("Editing Mode", ref _editingMode))
-            {
-                ClearDebugSpheres();
-                if (_editingMode)
-                {
-                    foreach (var point in _points)
-                        SpawnDebugSphere(point);
-                }
-            }
-        }
-        ImGuiNET.ImGui.End();
-    }
-
-    private void SpawnDebugSphere(Vector3 position)
-    {
-        var sphere = new MeshInstance3D
-        {
-            Mesh = new SphereMesh
-            {
-                Radius = 0.1f,
-                Height = 0.2f,
-                RadialSegments = 8,
-                Rings = 8,
-            },
-            Position = position
-        };
-
-        var mat = new StandardMaterial3D
-        {
-            AlbedoColor = Colors.DarkRed,
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
-        };
-        sphere.MaterialOverride = mat;
-
-        var body = new StaticBody3D();
-        var collider = new CollisionShape3D
-        {
-            Shape = new SphereShape3D { Radius = 0.1f }
-        };
-        body.AddChild(collider);
-        body.Position = Vector3.Zero;
-        sphere.AddChild(body);
-
-        AddChild(sphere);
-        _debugSpheres.Add(sphere);
-    }
-
-    private void ClearDebugSpheres()
-    {
-        foreach (var sphere in _debugSpheres)
-        {
-            if (IsInstanceValid(sphere))
-                sphere.QueueFree();
-        }
-        _debugSpheres.Clear();
-    }
-
     private void TrySelectSphere(Vector2 mousePos)
     {
         var camera = GetViewport().GetCamera3D();
         if (camera == null) return;
-        
-      
 
         Vector3 origin = camera.ProjectRayOrigin(mousePos);
         Vector3 direction = camera.ProjectRayNormal(mousePos) * 1000f;
@@ -331,7 +182,7 @@ public partial class CustomMeshObject : Node
                 DeselectSphere();
                 _selectedPointIndex = i;
                 AttachGizmoToSelected();
-                _dragStartPos = _points[_selectedPointIndex];
+                _dragStartPos = _points[_selectedPointIndex].Position;
                 return;
             }
         }
@@ -369,177 +220,305 @@ public partial class CustomMeshObject : Node
         _selectedPointIndex = -1;
     }
 
-    public void Undo()
+    private Vector3 GetScaleFromBasis(Basis basis)
     {
-        if (_undoStack.Count == 0)
-            return;
-
-        var edit = _undoStack.Pop();
-    
-        if (!IsValidEdit(edit)) return;
-
-        var inverse = GetInverseEdit(edit);
-        _redoStack.Push(inverse);
-
-        ApplyEdit(edit, undo: true);
+        return new Vector3(
+            basis.X.Length(),
+            basis.Y.Length(),
+            basis.Z.Length()
+        );
     }
 
-    public void Redo()
+    private void GenerateMeshFromPoints()
     {
-        if (_redoStack.Count == 0)
-            return;
+        _mesh.ClearSurfaces();
+        _mesh.SurfaceBegin(Mesh.PrimitiveType.Triangles);
 
-        var edit = _redoStack.Pop();
-
-        if (!IsValidEdit(edit)) return;
-
-        var inverse = GetInverseEdit(edit);
-        _undoStack.Push(inverse);
-
-        ApplyEdit(edit, undo: false);
-    }
-
-
-    private PointEdit GetInverseEdit(PointEdit edit)
-    {
-        if (edit.Action == EditAction.Move || edit.Action == EditAction.Rotate || edit.Action == EditAction.Scale)
+        if (_points.Count == 1)
         {
-            if (edit.Index < 0 || edit.Index >= _points.Count)
-            {
-                GD.PrintErr($"[GetInverseEdit] Invalid index {edit.Index}");
-                return edit;
-            }
+            // Draw a small crosshair or placeholder triangle at the point
+            Vector3 p = _points[0].Position;
+            float size = _thickness;
+            _mesh.SurfaceAddVertex(p + new Vector3(size, 0, 0));
+            _mesh.SurfaceAddVertex(p + new Vector3(0, size, 0));
+            _mesh.SurfaceAddVertex(p + new Vector3(0, 0, size));
+        }
+        else if (_points.Count == 2)
+        {
+            var p0 = _points[0];
+            var p1 = _points[1];
 
-            return new PointEdit
-            {
-                Action = edit.Action, // keep same action type
-                Index = edit.Index,
-                Position = _points[edit.Index] // current position becomes "redo"
-            };
+            Vector3 dir = (p1.Position - p0.Position).Normalized();
+            Vector3 right = dir.Cross(Vector3.Up).Normalized() * _thickness;
+
+            Vector3 a = p0.Position + right;
+            Vector3 b = p0.Position - right;
+            Vector3 c = p1.Position + right;
+            Vector3 d = p1.Position - right;
+
+            _mesh.SurfaceAddVertex(a);
+            _mesh.SurfaceAddVertex(b);
+            _mesh.SurfaceAddVertex(c);
+
+            _mesh.SurfaceAddVertex(b);
+            _mesh.SurfaceAddVertex(d);
+            _mesh.SurfaceAddVertex(c);
         }
 
-        return edit.Action switch
+
+        else if (_points.Count >= 3)
         {
-            EditAction.Add => new PointEdit
+            for (int i = 0; i < _points.Count - 2; i++)
             {
-                Action = EditAction.Remove,
-                Index = edit.Index,
-                Position = _points[Math.Min(edit.Index, _points.Count - 1)]
-            },
-            EditAction.Remove => new PointEdit
+                Vector3 a = _points[i].Position;
+                Vector3 b = _points[i + 1].Position;
+                Vector3 c = _points[i + 2].Position;
+
+                _mesh.SurfaceAddVertex(a);
+                _mesh.SurfaceAddVertex(b);
+                _mesh.SurfaceAddVertex(c);
+            }
+        }
+
+        _mesh.SurfaceEnd();
+    }
+
+
+    private void DrawImGuiEditor()
+    {
+        if (Engine.IsEditorHint()) return;
+
+        if (ImGui.Begin("Custom Mesh Editor"))
+        {
+            if (ImGui.Button("Add Point"))
+            {
+                Vector3 newPoint = _points.Count > 0 ? _points[^1].Position + new Vector3(0.5f, 0, 0) : Vector3.Zero;
+                AddPoint(newPoint);
+            }
+
+            if (ImGui.Button("Delete Point"))
+            {
+                DeleteSelectedPoint();
+            }
+
+
+            if (ImGui.Button("Clear Points"))
+            {
+                ClearPoints();
+            }
+
+            ImGui.SliderFloat("Thickness", ref _thickness, 0.01f, 0.5f);
+
+            if (ImGui.Checkbox("Editing Mode", ref _editingMode))
+            {
+                ClearDebugSpheres();
+                if (_editingMode)
+                {
+                    foreach (var cp in _points)
+                        SpawnDebugSphere(cp.Position);
+                }
+            }
+        }
+        ImGui.End();
+    }
+
+    private void AddPoint(Vector3 point)
+    {
+        var cp = new ControlPoint { Position = point, Rotation = Basis.Identity, Scale = Vector3.One };
+        _points.Add(cp);
+        PushUndo(new PointEdit 
+        {
+            Action = EditAction.Add,
+            Index = _points.Count - 1,
+            State = cp
+        });
+
+        _redoStack.Clear();
+        if (_editingMode) SpawnDebugSphere(point);
+    }
+    
+    private void DeleteSelectedPoint()
+    {
+        if (_selectedPointIndex < 0 || _selectedPointIndex >= _points.Count)
+            return;
+
+        // Store before deselecting (since it resets _selectedPointIndex)
+        int indexToDelete = _selectedPointIndex;
+        var deletedPoint = _points[indexToDelete];
+
+        PushUndo(new PointEdit
+        {
+            Action = EditAction.Remove,
+            Index = indexToDelete,
+            State = deletedPoint
+        });
+
+        DeselectSphere(); // safe now
+
+        _points.RemoveAt(indexToDelete);
+
+        if (_editingMode && indexToDelete < _debugSpheres.Count)
+        {
+            var sphere = _debugSpheres[indexToDelete];
+            if (IsInstanceValid(sphere))
+                sphere.QueueFree();
+            _debugSpheres.RemoveAt(indexToDelete);
+        }
+
+        GenerateMeshFromPoints();
+    }
+
+    private void ClearPoints()
+    {
+        _points.Clear();
+        ClearDebugSpheres();
+    }
+
+    private void ClearDebugSpheres()
+    {
+        foreach (var sphere in _debugSpheres)
+            if (IsInstanceValid(sphere))
+                sphere.QueueFree();
+        _debugSpheres.Clear();
+    }
+
+    private MeshInstance3D SpawnDebugSphere(Vector3 position)
+    {
+        var sphere = new MeshInstance3D
+        {
+            Mesh = new SphereMesh { Radius = 0.1f, Height = 0.2f, RadialSegments = 8, Rings = 8 },
+            Position = position,
+            MaterialOverride = new StandardMaterial3D { AlbedoColor = Colors.DarkRed, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded }
+        };
+
+        var body = new StaticBody3D();
+        var collider = new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.1f } };
+        body.AddChild(collider);
+        body.Position = Vector3.Zero;
+        sphere.AddChild(body);
+
+        AddChild(sphere);
+        _debugSpheres.Add(sphere);
+        return sphere;
+    }
+
+    
+    public void Undo()
+    {
+        if (_undoStack.Count == 0) return;
+        var edit = _undoStack.Pop();
+
+        // Save current for Redo
+        if (edit.Action == EditAction.Remove)
+        {
+            _points.Insert(edit.Index, edit.State);
+            _redoStack.Push(new PointEdit
             {
                 Action = EditAction.Add,
                 Index = edit.Index,
-                Position = edit.Position
-            },
-            _ => edit
-        };
+                State = edit.State
+            });
+
+            if (_editingMode)
+                _debugSpheres.Insert(edit.Index, SpawnDebugSphere(edit.State.Position));
+        }
+        else if (edit.Action == EditAction.Add)
+        {
+            if (edit.Index >= 0 && edit.Index < _points.Count)
+            {
+                _redoStack.Push(new PointEdit
+                {
+                    Action = EditAction.Remove,
+                    Index = edit.Index,
+                    State = _points[edit.Index]
+                });
+
+                _points.RemoveAt(edit.Index);
+                if (_editingMode && edit.Index < _debugSpheres.Count)
+                {
+                    _debugSpheres[edit.Index].QueueFree();
+                    _debugSpheres.RemoveAt(edit.Index);
+                }
+            }
+        }
+        else
+        {
+            var current = _points[edit.Index];
+            _redoStack.Push(new PointEdit { Action = edit.Action, Index = edit.Index, State = current });
+            _points[edit.Index] = edit.State;
+            UpdateDebugSphere(edit.Index);
+        }
+
+        GenerateMeshFromPoints();
     }
 
 
-
-
-    private void ApplyPosition(int index, Vector3 pos)
+    public void Redo()
     {
-        if (index < 0 || index >= _points.Count)
+        if (_redoStack.Count == 0) return;
+        var edit = _redoStack.Pop();
+
+        if (edit.Action == EditAction.Add)
         {
-            GD.PrintErr($"[ApplyPosition] Invalid index {index}.");
-            return;
+            _points.Insert(edit.Index, edit.State);
+            _undoStack.Push(new PointEdit
+            {
+                Action = EditAction.Remove,
+                Index = edit.Index,
+                State = edit.State
+            });
+
+            if (_editingMode)
+                _debugSpheres.Insert(edit.Index, SpawnDebugSphere(edit.State.Position));
+        }
+        else if (edit.Action == EditAction.Remove)
+        {
+            if (edit.Index >= 0 && edit.Index < _points.Count)
+            {
+                _undoStack.Push(new PointEdit
+                {
+                    Action = EditAction.Add,
+                    Index = edit.Index,
+                    State = _points[edit.Index]
+                });
+
+                _points.RemoveAt(edit.Index);
+                if (_editingMode && edit.Index < _debugSpheres.Count)
+                {
+                    _debugSpheres[edit.Index].QueueFree();
+                    _debugSpheres.RemoveAt(edit.Index);
+                }
+            }
+        }
+        else
+        {
+            if (edit.Index >= 0 && edit.Index < _points.Count)
+            {
+                var current = _points[edit.Index];
+                _undoStack.Push(new PointEdit { Action = edit.Action, Index = edit.Index, State = current });
+                _points[edit.Index] = edit.State;
+                UpdateDebugSphere(edit.Index);
+            }
         }
 
-        _points[index] = pos;
-        _curve.SetPointPosition(index, pos);
-
-        if (_editingMode && index < _debugSpheres.Count)
-            _debugSpheres[index].GlobalTransform = new Transform3D(Basis.Identity, pos);
+        GenerateMeshFromPoints();
     }
 
 
-    private void InsertPoint(int index, Vector3 pos)
+
+    private void UpdateDebugSphere(int index)
     {
-        if (index < 0 || index > _points.Count)
-        {
-            GD.PrintErr($"[InsertPoint] Invalid index {index} for inserting.");
-            return;
-        }
-
-        _points.Insert(index, pos);
-
-        _curve.ClearPoints();
-        foreach (var p in _points)
-            _curve.AddPoint(p);
-
-        if (_editingMode)
-        {
-            ClearDebugSpheres();
-            foreach (var p in _points)
-                SpawnDebugSphere(p);
-        }
+        if (_editingMode && index >= 0 && index < _debugSpheres.Count)
+            _debugSpheres[index].GlobalTransform = _points[index].ToTransform();
     }
-
-    private bool IsValidEdit(PointEdit edit)
+    
+    private void PushUndo(PointEdit edit)
     {
-        switch (edit.Action)
-        {
-            case EditAction.Move:
-            case EditAction.Remove:
-            case EditAction.Add:
-                return edit.Index >= 0 && edit.Index <= _points.Count;
-
-            default:
-                return false;
-        }
-    }
-
-    private void ApplyEdit(PointEdit edit, bool undo)
-    {
-        switch (edit.Action)
-        {
-            case EditAction.Move:
-            case EditAction.Rotate:
-            case EditAction.Scale:
-                ApplyPosition(edit.Index, edit.Position);
-                break;
-
-            case EditAction.Add:
-                if (undo) RemovePoint(edit.Index);
-                else InsertPoint(edit.Index, edit.Position);
-                break;
-
-            case EditAction.Remove:
-                if (undo) InsertPoint(edit.Index, edit.Position);
-                else RemovePoint(edit.Index);
-                break;
-        }
-
-        // Refresh selection visuals
-        if (_selectedPointIndex == edit.Index)
-        {
-            DeselectSphere();
-            _selectedPointIndex = edit.Index;
-            AttachGizmoToSelected();
-        }
+        _undoStack.Push(edit);
+        if (_undoStack.Count > MAX_HISTORY)
+            _undoStack = new Stack<PointEdit>(_undoStack.ToArray()[..MAX_HISTORY]); 
     }
 
 
-
-    private void RemovePoint(int index)
-    {
-        if (index < 0 || index >= _points.Count)
-        {
-            GD.PrintErr($"[RemovePoint] Invalid index {index} for points list.");
-            return;
-        }
-
-        _points.RemoveAt(index);
-        _curve.RemovePoint(index);
-
-        if (_editingMode && index < _debugSpheres.Count)
-        {
-            var sphere = _debugSpheres[index];
-            _debugSpheres.RemoveAt(index);
-            sphere.QueueFree();
-        }
-    }
-
+    private bool IsInstanceValid(Node node) => node != null && node.IsInsideTree();
 }
