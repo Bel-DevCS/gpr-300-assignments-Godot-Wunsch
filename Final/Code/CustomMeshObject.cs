@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Gizmo3DPlugin;
 using ImGuiNET;
 
@@ -10,7 +11,6 @@ public partial class CustomMeshObject : Node
     private MeshInstance3D _meshInstance;
 
     private List<ControlPoint> _points = new();
-
     private float _thickness = 0.1f;
     private bool _editingMode = true;
     private List<MeshInstance3D> _debugSpheres = new();
@@ -20,11 +20,15 @@ public partial class CustomMeshObject : Node
     private Stack<PointEdit> _undoStack = new();
     private Stack<PointEdit> _redoStack = new();
     private Vector3 _dragStartPos;
-    
     private const int MAX_HISTORY = 100;
+    private int _dragIndex = -1;
+    
+    private int _pendingReorderFrom = -1;
+    private int _pendingReorderTo = -1;
 
     private struct ControlPoint
     {
+        public string Label;
         public Vector3 Position;
         public Basis Rotation;
         public Vector3 Scale;
@@ -68,6 +72,94 @@ public partial class CustomMeshObject : Node
         AddChild(_gizmo);
         _gizmo.Mode = Gizmo3D.ToolMode.Move;
     }
+    
+
+private void DrawPointListImGui()
+{
+    for (int i = 0; i < _points.Count; i++)
+    {
+        ImGui.PushID(i);
+        ImGui.BeginGroup();
+
+        // Drag Handle
+        ImGui.PushStyleColor(ImGuiCol.Button, new System.Numerics.Vector4(0, 0, 0, 0)); // Transparent
+        ImGui.Button("≡");
+        ImGui.PopStyleColor();
+
+        if (ImGui.BeginDragDropSource())
+        {
+            ImGui.SetDragDropPayload("POINT_DRAG", IntPtr.Zero, 0);
+            _dragIndex = i;
+            ImGui.Text($"Moving: {_points[i].Label ?? $"Point {i}"}");
+            ImGui.EndDragDropSource();
+        }
+
+        ImGui.SameLine();
+
+        // Selectable
+        if (ImGui.Selectable(_points[i].Label ?? $"Point {i}", _selectedPointIndex == i))
+        {
+            _selectedPointIndex = i;
+        }
+
+        // Rename field
+        string label = _points[i].Label ?? $"Point {i}";
+        byte[] buffer = new byte[64];
+        var encoded = Encoding.UTF8.GetBytes(label);
+        Array.Copy(encoded, buffer, encoded.Length);
+
+        if (ImGui.InputText($"##label_{i}", buffer, (uint)buffer.Length))
+        {
+            var cp = _points[i];
+            cp.Label = Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+            _points[i] = cp;
+        }
+
+        // Drag-and-drop target
+        if (ImGui.BeginDragDropTarget())
+        {
+            unsafe
+            {
+                if (ImGui.AcceptDragDropPayload("POINT_DRAG").NativePtr != null && _dragIndex >= 0 && _dragIndex != i)
+                {
+                    _pendingReorderFrom = _dragIndex;
+                    _pendingReorderTo = i;
+                }
+                ImGui.EndDragDropTarget();
+            }
+        }
+
+        ImGui.EndGroup();
+        ImGui.Separator();
+        ImGui.PopID();
+    }
+
+    // Reorder handling AFTER iteration
+    if (_pendingReorderFrom >= 0 && _pendingReorderTo >= 0)
+    {
+        var movedPoint = _points[_pendingReorderFrom];
+        var movedSphere = _debugSpheres[_pendingReorderFrom];
+
+        _points.RemoveAt(_pendingReorderFrom);
+        _debugSpheres.RemoveAt(_pendingReorderFrom);
+
+        int insertAt = _pendingReorderTo;
+        if (_pendingReorderFrom < _pendingReorderTo)
+            insertAt--;
+
+        _points.Insert(insertAt, movedPoint);
+        _debugSpheres.Insert(insertAt, movedSphere);
+
+        _pendingReorderFrom = -1;
+        _pendingReorderTo = -1;
+
+        GenerateMeshFromPoints();
+    }
+
+}
+
+
+
 
     public override void _Process(double delta)
     {
@@ -82,15 +174,20 @@ public partial class CustomMeshObject : Node
         for (int i = 0; i < _debugSpheres.Count; i++)
         {
             Transform3D xform = _debugSpheres[i].GlobalTransform;
-            if (i >= _points.Count) continue; // avoid out of bounds
+            if (i >= _points.Count) continue;
+
+            var old = _points[i]; // preserve label
+
             _points[i] = new ControlPoint
             {
+                Label = old.Label,
                 Position = xform.Origin,
                 Rotation = xform.Basis.Orthonormalized(),
                 Scale = GetScaleFromBasis(xform.Basis)
             };
         }
     }
+
 
     public override void _UnhandledInput(InputEvent @event)
     {
@@ -301,7 +398,6 @@ public partial class CustomMeshObject : Node
                 DeleteSelectedPoint();
             }
 
-
             if (ImGui.Button("Clear Points"))
             {
                 ClearPoints();
@@ -318,13 +414,24 @@ public partial class CustomMeshObject : Node
                         SpawnDebugSphere(cp.Position);
                 }
             }
+
+            ImGui.Separator();
+            ImGui.Text("Point Order & Labels:");
+            DrawPointListImGui();
         }
         ImGui.End();
     }
 
     private void AddPoint(Vector3 point)
     {
-        var cp = new ControlPoint { Position = point, Rotation = Basis.Identity, Scale = Vector3.One };
+        var cp = new ControlPoint
+        {
+            Label = $"Point {_points.Count}",
+            Position = point,
+            Rotation = Basis.Identity,
+            Scale = Vector3.One
+        };
+        
         _points.Add(cp);
         PushUndo(new PointEdit 
         {
