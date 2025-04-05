@@ -8,11 +8,11 @@
 render_priority = 0
 shader = ExtResource("2_ep0ko")
 shader_parameter/albedo_color = Color(1, 0.8, 0.6, 1)
-shader_parameter/shading_levels = 3
-shader_parameter/rim_strength = 0.3
-shader_parameter/gradient_mix = 0.6
+shader_parameter/shading_levels = 2
+shader_parameter/rim_strength = 1.0
+shader_parameter/gradient_mix = 0.5
 shader_parameter/specular_size = 1.0
-shader_parameter/specular_intensity = 1.402
+shader_parameter/specular_intensity = 1.0
 
 [node name="Assignment6" type="Node3D"]
 script = ExtResource("1_eohe0")
@@ -22,5 +22,5 @@ _stylizedMaterial = SubResource("ShaderMaterial_toqsp")
 script = ExtResource("2_eohe0")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.424816, 0.90528, 0, -0.90528, 0.424816, 0, 0.96394, 0)
+transform = Transform3D(0.918584, 0.057763, 0.390981, -0.395225, 0.134253, 0.908721, 0, -0.989262, 0.146152, 0, 0.96394, 0)
 sky_mode = 1
