@@ -193,12 +193,13 @@ private void DrawInspector()
 
             if (_preImGuiEditSnapshot != null)
             {
-                _owner.PushUndo(new CustomMeshObject.PointEdit
+                EditSystem.PushUndo(EditMode.MeshEditing, new CustomMeshObject.PointEdit
                 {
                     Action = CustomMeshObject.EditAction.Move,
                     Index = _owner.SelectedPointIndex,
                     State = _preImGuiEditSnapshot.Value
                 });
+
 
                 _preImGuiEditSnapshot = null;
             }

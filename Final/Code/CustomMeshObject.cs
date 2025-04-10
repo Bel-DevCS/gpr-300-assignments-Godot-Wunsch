@@ -16,11 +16,8 @@ public partial class CustomMeshObject : Node
     private List<MeshInstance3D> _debugSpheres = new();
     private Gizmo3DPlugin.Gizmo3D _gizmo = new();
     private int _selectedPointIndex = -1;
-
-    public Stack<PointEdit> _undoStack = new();
-    private Stack<PointEdit> _redoStack = new();
+    
     private Vector3 _dragStartPos;
-    private const int MAX_HISTORY = 100;
     private int _dragIndex = -1;
     
     private int _pendingReorderFrom = -1;
@@ -73,7 +70,17 @@ public partial class CustomMeshObject : Node
         public int Index;
         public ControlPoint State;
     }
-
+    
+    private PointEdit MakeEdit(EditAction action, int index)
+    {
+        index = Mathf.Clamp(index, 0, _points.Count - 1);
+        return new PointEdit
+        {
+            Action = action,
+            Index = index,
+            State = _points[index]
+        };
+    }
 
     public override void _Ready()
     {
@@ -89,9 +96,11 @@ public partial class CustomMeshObject : Node
 
         AddChild(_gizmo);
         _gizmo.Mode = Gizmo3D.ToolMode.Move;
-        _runtimeUndoBaseline = _undoStack.Count;
         
         _ui = new CustomMeshObject_UI(this);
+        
+        EditSystem.RegisterEditor(EditMode.MeshEditing, this);
+        _runtimeUndoBaseline = EditSystem.GetUndoCount(EditMode.MeshEditing);
     }
     
 
@@ -107,8 +116,13 @@ public partial class CustomMeshObject : Node
     {
         for (int i = 0; i < _debugSpheres.Count; i++)
         {
-            Transform3D xform = _debugSpheres[i].GlobalTransform;
             if (i >= _points.Count) continue;
+
+            var sphere = _debugSpheres[i];
+            if (sphere == null || !IsInstanceValid(sphere))
+                continue;
+
+            Transform3D xform = sphere.GlobalTransform;
 
             var old = _points[i]; // preserve label
 
@@ -121,71 +135,71 @@ public partial class CustomMeshObject : Node
             };
         }
     }
+
     public override void _UnhandledInput(InputEvent @event)
+{
+    if (!_editingMode) return;
+
+    if (@event is InputEventMouseButton mouseBtn)
     {
-        if (!_editingMode) return;
-
-        if (@event is InputEventMouseButton mouseBtn)
+        if (mouseBtn.Pressed && mouseBtn.ButtonIndex == MouseButton.Left)
         {
-            if (mouseBtn.Pressed && mouseBtn.ButtonIndex == MouseButton.Left)
-            {
-                TrySelectSphere(mouseBtn.Position);
-            }
-            else if (!mouseBtn.Pressed && mouseBtn.ButtonIndex == MouseButton.Left && _selectedPointIndex != -1)
-            {
-                Vector3 newPos = _points[_selectedPointIndex].Position;
-
-                if (_dragStartPos.DistanceSquaredTo(newPos) > 0.0001f)
-                {
-                    var action = _gizmo.Mode switch
-                    {
-                        Gizmo3D.ToolMode.Move => EditAction.Move,
-                        Gizmo3D.ToolMode.Rotate => EditAction.Rotate,
-                        Gizmo3D.ToolMode.Scale => EditAction.Scale,
-                        _ => EditAction.Move
-                    };
-
-                    _undoStack.Push(new PointEdit
-                    {
-                        Action = action,
-                        Index = _selectedPointIndex,
-                        State = _points[_selectedPointIndex]
-                    });
-
-                    _redoStack.Clear();
-                    _dragStartPos = newPos;
-                }
-            }
+            TrySelectSphere(mouseBtn.Position);
         }
-
-        if (@event is InputEventKey key && key.Pressed)
+        else if (!mouseBtn.Pressed && mouseBtn.ButtonIndex == MouseButton.Left && _selectedPointIndex != -1)
         {
-            bool ctrl = Input.IsKeyPressed(Key.Ctrl);
+            Vector3 newPos = _points[_selectedPointIndex].Position;
 
-            if (ctrl && key.Keycode == Key.Z)
-                Undo();
-            else if (ctrl && key.Keycode == Key.Y)
-                Redo();
-            else if (!ctrl)
+            if (_dragStartPos.DistanceSquaredTo(newPos) > 0.0001f)
             {
-                switch (key.Keycode)
+                var action = _gizmo.Mode switch
                 {
-                    case Key.Key1:
-                        _gizmo.Mode = Gizmo3D.ToolMode.Move;
-                        break;
-                    case Key.Key2:
-                        _gizmo.Mode = Gizmo3D.ToolMode.Rotate;
-                        break;
-                    case Key.Key3:
-                        _gizmo.Mode = Gizmo3D.ToolMode.Scale;
-                        break;
-                    case Key.Escape:
-                        DeselectSphere();
-                        break;
-                }
+                    Gizmo3D.ToolMode.Move => EditAction.Move,
+                    Gizmo3D.ToolMode.Rotate => EditAction.Rotate,
+                    Gizmo3D.ToolMode.Scale => EditAction.Scale,
+                    _ => EditAction.Move
+                };
+                
+                var previousState = new PointEdit
+                {
+                    Action = action,
+                    Index = _selectedPointIndex,
+                    State = new ControlPoint
+                    {
+                        Label = _points[_selectedPointIndex].Label,
+                        Position = _dragStartPos,
+                        Rotation = _points[_selectedPointIndex].Rotation,
+                        Scale = _points[_selectedPointIndex].Scale
+                    }
+                };
+
+                EditSystem.PushUndo(EditMode.MeshEditing, previousState);
+                _dragStartPos = newPos;
             }
         }
     }
+
+    if (@event is InputEventKey key && key.Pressed)
+    {
+        bool ctrl = Input.IsKeyPressed(Key.Ctrl);
+
+        if (ctrl && key.Keycode == Key.Z)
+            Undo();
+        else if (ctrl && key.Keycode == Key.Y)
+            Redo();
+        else if (!ctrl)
+        {
+            switch (key.Keycode)
+            {
+                case Key.Key1: _gizmo.Mode = Gizmo3D.ToolMode.Move; break;
+                case Key.Key2: _gizmo.Mode = Gizmo3D.ToolMode.Rotate; break;
+                case Key.Key3: _gizmo.Mode = Gizmo3D.ToolMode.Scale; break;
+                case Key.Escape: DeselectSphere(); break;
+            }
+        }
+    }
+}
+
     private void TrySelectSphere(Vector2 mousePos)
     {
         var camera = GetViewport().GetCamera3D();
@@ -306,7 +320,7 @@ public partial class CustomMeshObject : Node
 
         _mesh.SurfaceEnd();
     }
-    private void AddPoint(Vector3 point)
+    private void AddPoint(Vector3 point, bool pushUndo = true)
     {
         var cp = new ControlPoint
         {
@@ -315,18 +329,14 @@ public partial class CustomMeshObject : Node
             Rotation = Basis.Identity,
             Scale = Vector3.One
         };
-        
-        _points.Add(cp);
-        PushUndo(new PointEdit 
-        {
-            Action = EditAction.Add,
-            Index = _points.Count - 1,
-            State = cp
-        });
 
-        _redoStack.Clear();
+        _points.Add(cp);
+        if (pushUndo)
+            EditSystem.PushUndo(EditMode.MeshEditing, MakeEdit(EditAction.Add, _points.Count - 1));
+
         if (_editingMode) SpawnDebugSphere(point);
     }
+
     private void DeleteSelectedPoint()
     {
         if (_selectedPointIndex < 0 || _selectedPointIndex >= _points.Count)
@@ -336,12 +346,8 @@ public partial class CustomMeshObject : Node
         int indexToDelete = _selectedPointIndex;
         var deletedPoint = _points[indexToDelete];
 
-        PushUndo(new PointEdit
-        {
-            Action = EditAction.Remove,
-            Index = indexToDelete,
-            State = deletedPoint
-        });
+        EditSystem.PushUndo(EditMode.MeshEditing, MakeEdit(EditAction.Remove, _selectedPointIndex));
+
 
         DeselectSphere(); // safe now
 
@@ -390,103 +396,159 @@ public partial class CustomMeshObject : Node
     }
     public void Undo()
     {
-        if (_undoStack.Count <= _runtimeUndoBaseline)
-            return; // Don't undo past runtime baseline
+        if (EditSystem.GetUndoCount(EditMode.MeshEditing) <= _runtimeUndoBaseline)
+        {
+            GD.Print("[Undo] At baseline — cannot undo further.");
+            return;
+        }
+        
+        var obj = EditSystem.PopUndo(EditMode.MeshEditing);
+        if (obj is not PointEdit edit) return;
 
-        var edit = _undoStack.Pop();
-    
-        // Save for redo
-        if (edit.Action == EditAction.Remove)
+        GD.Print($"[Undo] Undoing {edit.Action} at index {edit.Index}");
+
+        switch (edit.Action)
         {
-            _points.Insert(edit.Index, edit.State);
-            _redoStack.Push(new PointEdit { Action = EditAction.Add, Index = edit.Index, State = edit.State });
-            if (_editingMode)
-                _debugSpheres.Insert(edit.Index, SpawnDebugSphere(edit.State.Position));
-        }
-        else if (edit.Action == EditAction.Add)
-        {
-            if (edit.Index >= 0 && edit.Index < _points.Count)
-            {
-                _redoStack.Push(new PointEdit { Action = EditAction.Remove, Index = edit.Index, State = _points[edit.Index] });
-                _points.RemoveAt(edit.Index);
-                if (_editingMode && edit.Index < _debugSpheres.Count)
+            case EditAction.Move:
+            case EditAction.Rotate:
+            case EditAction.Scale:
+                if (edit.Index >= 0 && edit.Index < _points.Count)
                 {
-                    _debugSpheres[edit.Index].QueueFree();
-                    _debugSpheres.RemoveAt(edit.Index);
+                    var current = _points[edit.Index];
+                    _points[edit.Index] = edit.State;
+                    UpdateDebugSphere(edit.Index);
+
+                    EditSystem.PushRedo(EditMode.MeshEditing, new PointEdit
+                    {
+                        Action = edit.Action,
+                        Index = edit.Index,
+                        State = current
+                    });
                 }
-            }
-        }
-        else
-        {
-            var current = _points[edit.Index];
-            _redoStack.Push(new PointEdit { Action = edit.Action, Index = edit.Index, State = current });
-            _points[edit.Index] = edit.State;
-            UpdateDebugSphere(edit.Index);
+                break;
+
+            case EditAction.Add:
+                if (edit.Index >= 0 && edit.Index < _points.Count)
+                {
+                    var removed = _points[edit.Index];
+                    _points.RemoveAt(edit.Index);
+                    if (_editingMode && edit.Index < _debugSpheres.Count)
+                    {
+                        _debugSpheres[edit.Index].QueueFree();
+                        _debugSpheres.RemoveAt(edit.Index);
+                    }
+
+                    EditSystem.PushRedo(EditMode.MeshEditing, new PointEdit
+                    {
+                        Action = EditAction.Add,
+                        Index = edit.Index,
+                        State = removed
+                    });
+                }
+                break;
+
+            case EditAction.Remove:
+                _points.Insert(edit.Index, edit.State);
+                if (_editingMode)
+                    _debugSpheres.Insert(edit.Index, SpawnDebugSphere(edit.State.Position));
+
+                EditSystem.PushRedo(EditMode.MeshEditing, new PointEdit
+                {
+                    Action = EditAction.Remove,
+                    Index = edit.Index,
+                    State = edit.State
+                });
+                break;
         }
 
         GenerateMeshFromPoints();
     }
+
+
+
     public void Redo()
     {
-        if (_redoStack.Count == 0) return;
-        var edit = _redoStack.Pop();
+        var obj = EditSystem.PopRedo(EditMode.MeshEditing);
+        if (obj is not PointEdit edit) return;
 
-        if (edit.Action == EditAction.Add)
-        {
-            _points.Insert(edit.Index, edit.State);
-            _undoStack.Push(new PointEdit
-            {
-                Action = EditAction.Remove,
-                Index = edit.Index,
-                State = edit.State
-            });
+        GD.Print($"[Redo] Redoing {edit.Action} at index {edit.Index}");
 
-            if (_editingMode)
-                _debugSpheres.Insert(edit.Index, SpawnDebugSphere(edit.State.Position));
-        }
-        else if (edit.Action == EditAction.Remove)
+        switch (edit.Action)
         {
-            if (edit.Index >= 0 && edit.Index < _points.Count)
-            {
-                _undoStack.Push(new PointEdit
+            case EditAction.Move:
+            case EditAction.Rotate:
+            case EditAction.Scale:
+                if (edit.Index >= 0 && edit.Index < _points.Count)
+                {
+                    var current = _points[edit.Index];
+                    _points[edit.Index] = edit.State;
+                    UpdateDebugSphere(edit.Index);
+
+                    EditSystem.PushUndo(EditMode.MeshEditing, new PointEdit
+                    {
+                        Action = edit.Action,
+                        Index = edit.Index,
+                        State = current
+                    });
+                }
+                break;
+
+            case EditAction.Add:
+                _points.Insert(edit.Index, edit.State);
+                if (_editingMode)
+                    _debugSpheres.Insert(edit.Index, SpawnDebugSphere(edit.State.Position));
+
+                EditSystem.PushUndo(EditMode.MeshEditing, new PointEdit
                 {
                     Action = EditAction.Add,
                     Index = edit.Index,
-                    State = _points[edit.Index]
+                    State = edit.State
                 });
+                break;
 
-                _points.RemoveAt(edit.Index);
-                if (_editingMode && edit.Index < _debugSpheres.Count)
+            case EditAction.Remove:
+                if (edit.Index >= 0 && edit.Index < _points.Count)
                 {
-                    _debugSpheres[edit.Index].QueueFree();
-                    _debugSpheres.RemoveAt(edit.Index);
+                    var removed = _points[edit.Index];
+                    _points.RemoveAt(edit.Index);
+                    if (_editingMode && edit.Index < _debugSpheres.Count)
+                    {
+                        _debugSpheres[edit.Index].QueueFree();
+                        _debugSpheres.RemoveAt(edit.Index);
+                    }
+
+                    EditSystem.PushUndo(EditMode.MeshEditing, new PointEdit
+                    {
+                        Action = EditAction.Remove,
+                        Index = edit.Index,
+                        State = removed
+                    });
                 }
-            }
-        }
-        else
-        {
-            if (edit.Index >= 0 && edit.Index < _points.Count)
-            {
-                var current = _points[edit.Index];
-                _undoStack.Push(new PointEdit { Action = edit.Action, Index = edit.Index, State = current });
-                _points[edit.Index] = edit.State;
-                UpdateDebugSphere(edit.Index);
-            }
+                break;
         }
 
         GenerateMeshFromPoints();
     }
+
+
+
     public void UpdateDebugSphere(int index)
     {
-        if (_editingMode && index >= 0 && index < _debugSpheres.Count)
-            _debugSpheres[index].GlobalTransform = _points[index].ToTransform();
+        if (!_editingMode || index < 0 || index >= _debugSpheres.Count)
+            return;
+
+        var sphere = _debugSpheres[index];
+
+        if (!IsInstanceValid(sphere))
+        {
+            if (_selectedPointIndex == index)
+                DeselectSphere();
+            return;
+        }
+
+        sphere.GlobalTransform = _points[index].ToTransform();
     }
-    public void PushUndo(PointEdit edit)
-    {
-        _undoStack.Push(edit);
-        if (_undoStack.Count > MAX_HISTORY)
-            _undoStack = new Stack<PointEdit>(_undoStack.ToArray()[..MAX_HISTORY]); 
-    }
+
     public void SelectPoint(int index)
     {
         if (index < 0 || index >= _points.Count || index >= _debugSpheres.Count)
