@@ -54,6 +54,7 @@ public partial class CustomMeshObject : Node
         {
             return new Transform3D(Rotation.Scaled(Scale), Position);
         }
+        
     }
 
     public enum EditAction

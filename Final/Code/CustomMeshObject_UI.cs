@@ -32,12 +32,18 @@ public class CustomMeshObject_UI
                 _owner.OnToggleEditingMode();
 
             ImGui.Separator();
-            ImGui.Text("Point Order & Labels:");
-            DrawPointList();
+
+            if (_owner._editingMode)
+            {
+                ImGui.Text("Point Order & Labels:");
+                DrawPointList();
+            }
+         
         }
         ImGui.End();
 
-        DrawInspector();
+        if(_owner._editingMode)
+            DrawInspector();
     }
 
     private int _dragIndex = -1;
