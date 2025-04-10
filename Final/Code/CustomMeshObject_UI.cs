@@ -42,8 +42,12 @@ public class CustomMeshObject_UI
         }
         ImGui.End();
 
-        if(_owner._editingMode)
+        if (_owner._editingMode)
+        {
             DrawInspector();
+            DrawEdgeInspector();
+        }
+
     }
 
     private int _dragIndex = -1;
@@ -208,5 +212,19 @@ private void DrawInspector()
 
     ImGui.End();
 }
+
+    private void DrawEdgeInspector()
+    {
+        if (_owner.SelectedEdgeIndex < 0 || _owner.SelectedEdgeIndex  >= _owner._edges.Count)
+            return;
+
+        if (ImGui.Begin("Selected Edge"))
+        {
+            ImGui.Text($"Editing Edge {_owner.SelectedEdgeIndex }");
+            _owner._edges[_owner.SelectedEdgeIndex ].DrawImGuiUI();
+        }
+        ImGui.End();
+    }
+
 
 }

@@ -39,10 +39,17 @@ public partial class CustomMeshObject : Node
     
     private CustomMeshObject_UI _ui;
     
-    private List<LineBuilder> _edges = new();
+    public List<LineBuilder> _edges = new();
     private List<MeshInstance3D> _edgeMeshes = new();
 
+    private int _selectedEdgeIndex = -1;
     
+    public int SelectedEdgeIndex
+    {
+        get => _selectedEdgeIndex;
+        set => _selectedEdgeIndex = value;
+    }
+
     
     public  struct ControlPoint
     {
@@ -151,6 +158,7 @@ public partial class CustomMeshObject : Node
         if (mouseBtn.Pressed && mouseBtn.ButtonIndex == MouseButton.Left)
         {
             TrySelectSphere(mouseBtn.Position);
+            TrySelectEdge(mouseBtn.Position);
         }
         else if (!mouseBtn.Pressed && mouseBtn.ButtonIndex == MouseButton.Left && _selectedPointIndex != -1)
         {
@@ -235,6 +243,58 @@ public partial class CustomMeshObject : Node
             }
         }
     }
+    private void TrySelectEdge(Vector2 mousePos)
+    {
+        var camera = GetViewport().GetCamera3D();
+        if (camera == null) return;
+
+        Vector3 origin = camera.ProjectRayOrigin(mousePos);
+        Vector3 direction = camera.ProjectRayNormal(mousePos) * 1000f;
+
+        var spaceState = GetViewport().GetWorld3D().DirectSpaceState;
+        var query = PhysicsRayQueryParameters3D.Create(origin, origin + direction);
+        var result = spaceState.IntersectRay(query);
+
+        if (!result.TryGetValue("collider", out var colliderVariant)) return;
+
+        var collider = colliderVariant.AsGodotObject() as CollisionObject3D;
+        if (collider == null) return;
+
+        for (int i = 0; i < _edgeMeshes.Count; i++)
+        {
+            if (collider.IsAncestorOf(_edgeMeshes[i]) || _edgeMeshes[i].IsAncestorOf(collider))
+            {
+                _selectedEdgeIndex = i;
+                GD.Print($"Selected edge {i}");
+                return;
+            }
+        }
+        
+        for (int i = 0; i < _edgeMeshes.Count; i++)
+        {
+            if (collider.IsAncestorOf(_edgeMeshes[i]) || _edgeMeshes[i].IsAncestorOf(collider))
+            {
+                _selectedEdgeIndex = i;
+                GD.Print($"[EdgeSelect] Selected edge {i}");
+
+                if (_edgeMeshes[i].MaterialOverride is StandardMaterial3D mat)
+                    mat.AlbedoColor = Colors.Green;
+
+                // Deselect others
+                for (int j = 0; j < _edgeMeshes.Count; j++)
+                {
+                    if (j == i) continue;
+                    if (_edgeMeshes[j].MaterialOverride is StandardMaterial3D otherMat)
+                        otherMat.AlbedoColor = Colors.Yellow;
+                }
+
+                return;
+            }
+        }
+
+        
+    }
+
     private void AttachGizmoToSelected()
     {
         for (int i = 0; i < _debugSpheres.Count; i++)
@@ -265,6 +325,12 @@ public partial class CustomMeshObject : Node
 
         _selectedPointIndex = -1;
     }
+   
+    private void DeselectEdge()
+    {
+        _selectedEdgeIndex = -1;
+    }
+
     private Vector3 GetScaleFromBasis(Basis basis)
     {
         return new Vector3(
@@ -349,24 +415,46 @@ public partial class CustomMeshObject : Node
 
         for (int i = 0; i < edgeCount; i++)
         {
-            int nextIndex = (i + 1) % edgeCount; // wraps around at end
+            int nextIndex = (i + 1) % edgeCount; // Wrap around to close loop
+            Vector3 start = _points[i].Position;
+            Vector3 end = _points[nextIndex].Position;
 
-            var line = new LineBuilder
-            {
-                StartPoint = _points[i].Position,
-                EndPoint = _points[nextIndex].Position,
-                CurveAmount = 0.0f // default; could later be per-edge
-            };
-
+            var line = new LineBuilder();
+            line.SetEndpoints(start, end);
+            line.CurveAmount = 0.0f; // optional tweak
             line.DrawLine();
 
             var mesh = line.CreateMeshInstance();
             AddChild(mesh);
 
+            var body = new StaticBody3D();
+            var shape = new CollisionShape3D
+            {
+                Shape = new BoxShape3D
+                {
+                    Size = new Vector3(0.1f, 0.1f, (end - start).Length())
+                }
+            };
+            body.AddChild(shape);
+
+            // Align the body with the edge
+            Vector3 forward = (end - start).Normalized();
+            Vector3 up = Vector3.Up;
+            Vector3 right = up.Cross(forward).Normalized();
+            up = forward.Cross(right).Normalized(); // Re-orthogonalize
+            Basis basis = new Basis(right, up, forward);
+
+            Vector3 midpoint = (start + end) * 0.5f;
+            body.GlobalTransform = new Transform3D(basis, midpoint);
+            body.Position = Vector3.Zero; // Local to mesh
+
+            mesh.AddChild(body);
+
             _edges.Add(line);
             _edgeMeshes.Add(mesh);
         }
     }
+
 
 
     
