@@ -1,19 +1,44 @@
-using Godot;
-using ImGuiNET;
-using System;
-using System.Collections.Generic;
-using System.Numerics;
-using Vector3 = Godot.Vector3; // For ImGui
+    using Godot;
+    using ImGuiNET;
+    using System;
+    using System.Collections.Generic;
+    using System.Numerics;
+    using Vector3 = Godot.Vector3; // For ImGui
+
+    public enum CurveMode
+    {
+        Linear,
+        Quadratic,
+        Cubic,
+        SineWave,
+        Arc,
+        Sawtooth,
+        ZigZag
+    }
+
 
 public class LineBuilder
 {
     private Vector3 _startPoint;
     private Vector3 _endPoint;
-    public float CurveAmount = 0.0f;
-    public int SegmentCount = 16;
     private ImmediateMesh _mesh;
 
-    // This will hold the points along the curve
+    public CurveMode Mode = CurveMode.Quadratic;
+    public int SegmentCount = 16;
+
+    public float CurveAmount = 0.0f; // General usage
+
+    // Quadratic/Cubic
+    public Vector3 Bias = new Vector3(0, 1, 0);
+
+    // SineWave
+    public float SineFrequency = 2f;
+    public float SinePhase = 0f;
+
+    // Spiral
+    public int SpiralLoops = 2;
+    public float SpiralTaper = 1f;
+
     public List<Vector3> Points { get; private set; }
 
     public LineBuilder()
@@ -32,8 +57,7 @@ public class LineBuilder
 
     public void DrawLine()
     {
-        Points.Clear();  // Clear previous points
-
+        Points.Clear();
         _mesh.ClearSurfaces();
         _mesh.SurfaceBegin(Mesh.PrimitiveType.LineStrip);
 
@@ -41,26 +65,114 @@ public class LineBuilder
         {
             float t = i / (float)SegmentCount;
             Vector3 point = GetPointAlongLine(t);
-            Points.Add(point);  // Store the point for later use
+            Points.Add(point);
             _mesh.SurfaceAddVertex(point);
         }
 
         _mesh.SurfaceEnd();
     }
 
-    private Vector3 GetPointAlongLine(float t)
+   private Vector3 GetPointAlongLine(float t)
+{
+    switch (Mode)
     {
-        Vector3 mid = (_startPoint + _endPoint) * 0.5f + new Vector3(0, CurveAmount, 0);
-        Vector3 a = _startPoint.Lerp(mid, t);
-        Vector3 b = mid.Lerp(_endPoint, t);
-        return a.Lerp(b, t);
+        case CurveMode.Linear:
+            return _startPoint.Lerp(_endPoint, t);
+
+        case CurveMode.Quadratic:
+        {
+            Vector3 mid = (_startPoint + _endPoint) * 0.5f + Bias * CurveAmount;
+            Vector3 a = _startPoint.Lerp(mid, t);
+            Vector3 b = mid.Lerp(_endPoint, t);
+            return a.Lerp(b, t);
+        }
+
+        case CurveMode.Cubic:
+        {
+            Vector3 p1 = _startPoint;
+            Vector3 p2 = _startPoint + Bias * CurveAmount;
+            Vector3 p3 = _endPoint - Bias * CurveAmount;
+            Vector3 p4 = _endPoint;
+
+            return Mathf.Pow(1 - t, 3) * p1 +
+                   3 * Mathf.Pow(1 - t, 2) * t * p2 +
+                   3 * (1 - t) * Mathf.Pow(t, 2) * p3 +
+                   Mathf.Pow(t, 3) * p4;
+        }
+
+        case CurveMode.SineWave:
+        {
+            Vector3 dir = _endPoint - _startPoint;
+            Vector3 basePos = _startPoint + dir * t;
+            float wave = Mathf.Sin(t * SineFrequency * Mathf.Pi * 2 + SinePhase) * CurveAmount;
+            return basePos + Bias.Normalized() * wave;
+        }
+
+        case CurveMode.Arc:
+        {
+            // Half-circle arc (bias is up)
+            Vector3 dir = _endPoint - _startPoint;
+            Vector3 center = (_startPoint + _endPoint) * 0.5f;
+            float angle = Mathf.Pi * (t - 0.5f); // Range [-π/2, π/2]
+            Vector3 perp = Bias.Normalized() * CurveAmount;
+            Vector3 pos = center + Mathf.Cos(angle) * (dir * 0.5f) + Mathf.Sin(angle) * perp;
+            return pos;
+        }
+
+        case CurveMode.Sawtooth:
+        {
+            Vector3 dir = _endPoint - _startPoint;
+            Vector3 basePos = _startPoint + dir * t;
+            float wave = ((t * SineFrequency) % 1.0f) * 2f - 1f;
+            return basePos + Bias.Normalized() * wave * CurveAmount;
+        }
+
+        case CurveMode.ZigZag:
+        {
+            Vector3 dir = _endPoint - _startPoint;
+            Vector3 basePos = _startPoint + dir * t;
+            float wave = Mathf.Sign(MathF.Sin(t * SineFrequency * Mathf.Pi * 2)) * CurveAmount;
+            return basePos + Bias.Normalized() * wave;
+        }
+
+        default:
+            return _startPoint.Lerp(_endPoint, t);
+    }
+}
+
+public void DrawImGui()
+{
+    ImGui.SliderInt("Segments", ref SegmentCount, 2, 64);
+
+    var modes = Enum.GetNames(typeof(CurveMode));
+    int selected = (int)Mode;
+    if (ImGui.Combo("Curve Mode", ref selected, modes, modes.Length))
+        Mode = (CurveMode)selected;
+
+    ImGui.SliderFloat("Curve Amount", ref CurveAmount, -5f, 5f);
+
+    switch (Mode)
+    {
+        case CurveMode.Quadratic:
+        case CurveMode.Cubic:
+        case CurveMode.Arc:
+        case CurveMode.SineWave:
+        case CurveMode.Sawtooth:
+        case CurveMode.ZigZag:
+            ImGui.Text("Bias (direction of curve):");
+            System.Numerics.Vector3 biasVec = new(Bias.X, Bias.Y, Bias.Z);
+            if (ImGui.DragFloat3("Bias", ref biasVec))
+                Bias = new Vector3(biasVec.X, biasVec.Y, biasVec.Z);
+            break;
     }
 
-    public void DrawImGui()
+    if (Mode == CurveMode.SineWave || Mode == CurveMode.Sawtooth || Mode == CurveMode.ZigZag)
     {
-        ImGui.SliderFloat("Curve Amount", ref CurveAmount, -5f, 5f);
-        ImGui.SliderInt("Segments", ref SegmentCount, 2, 64);
+        ImGui.SliderFloat("Sine Frequency", ref SineFrequency, 0.1f, 10f);
+        if (Mode == CurveMode.SineWave)
+            ImGui.SliderFloat("Sine Phase", ref SinePhase, 0f, Mathf.Pi * 2);
     }
+}
 
     public MeshInstance3D CreateMeshInstance()
     {
@@ -74,11 +186,8 @@ public class LineBuilder
             }
         };
 
-        // Add a StaticBody3D for picking support
         var body = new StaticBody3D();
-    
-        // Add a capsule or multiple small spheres along the line
-        // You could also dynamically compute a convex shape from the points if needed
+
         for (int i = 0; i < Points.Count - 1; i++)
         {
             var a = Points[i];
@@ -87,27 +196,22 @@ public class LineBuilder
             var dir = b - a;
             var length = dir.Length();
 
-            var capsule = new CollisionShape3D();
-            capsule.Shape = new CapsuleShape3D
+            var capsule = new CollisionShape3D
             {
-                Radius = 0.05f,
-                Height = MathF.Max(0.01f, length - 0.1f) // Prevent negative or zero height
+                Shape = new CapsuleShape3D
+                {
+                    Radius = 0.05f,
+                    Height = MathF.Max(0.01f, length - 0.1f)
+                },
+                Transform = new Transform3D(Basis.LookingAt(dir.Normalized(), Vector3.Up), mid)
             };
 
-
-            // Capsule shape is aligned along Y by default
-            var transform = new Transform3D();
-            transform.Origin = mid;
-            transform.Basis = Basis.LookingAt(dir.Normalized(), Vector3.Up);
-
-            capsule.Transform = transform;
             body.AddChild(capsule);
         }
 
         instance.AddChild(body);
         return instance;
     }
-
 }
 
 

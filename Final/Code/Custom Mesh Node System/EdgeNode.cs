@@ -6,6 +6,10 @@ public partial class EdgeNode : Node3D
 {
     public PointNode PointA { get; private set; }
     public PointNode PointB { get; private set; }
+    
+    public Vector3 GetStartPoint() => PointA?.GlobalPosition ?? Vector3.Zero;
+    public Vector3 GetEndPoint() => PointB?.GlobalPosition ?? Vector3.Zero;
+
 
     public List<FaceNode> ConnectedFaces { get; private set; } = new();
 
@@ -14,9 +18,9 @@ public partial class EdgeNode : Node3D
 
     public override void _Ready()
     {
+        // Create mesh once
         _lineMesh = Line.CreateMeshInstance();
         AddChild(_lineMesh);
-        UpdateEdge();
     }
 
     public void SetPoints(PointNode a, PointNode b)
@@ -33,16 +37,11 @@ public partial class EdgeNode : Node3D
 
         Line.SetEndpoints(PointA.GlobalPosition, PointB.GlobalPosition);
         Line.DrawLine();
-
-        if (_lineMesh != null && _lineMesh.IsInsideTree())
-        {
-            RemoveChild(_lineMesh);
-            _lineMesh.QueueFree();
-        }
-
-        _lineMesh = Line.CreateMeshInstance();
-        AddChild(_lineMesh);
+        
+        foreach (var face in ConnectedFaces)
+            face.UpdateFace();
     }
+
 
     public void RegisterFace(FaceNode face)
     {

@@ -42,53 +42,47 @@ public partial class FaceNode : Node3D
 
     public void GenerateFaceMesh()
     {
-        if (Edges.Count < 2)
-            return;
+        if (Edges.Count < 3) return;
 
-        SurfaceTool st = new SurfaceTool();
-        st.Begin(Mesh.PrimitiveType.Triangles);
-        st.SetSmoothGroup(0);
+        var points3D = new List<Vector3>();
+        var points2D = new List<Vector2>();
+        var seen = new HashSet<Vector2>();
 
-        int edgeCount = Edges.Count;
-
-        for (int i = 0; i < edgeCount; i++)
+        foreach (var edge in Edges)
         {
-            var a = Edges[i].Line.Points;
-            var b = Edges[(i + 1) % edgeCount].Line.Points;
-
-            int ia = 0, ib = 0;
-
-            while (ia < a.Count - 1 || ib < b.Count - 1)
+            foreach (var p in edge.Line.Points)
             {
-                Vector3 a1 = a[ia];
-                Vector3 a2 = (ia + 1 < a.Count) ? a[ia + 1] : a1;
-                Vector3 b1 = b[ib];
-                Vector3 b2 = (ib + 1 < b.Count) ? b[ib + 1] : b1;
+                var v2 = new Vector2(p.X, p.Y); // or .XZ
+                v2 = new Vector2(Mathf.Round(v2.X * 1000f) / 1000f, Mathf.Round(v2.Y * 1000f) / 1000f);
 
-                float lenA = (a2 - a1).LengthSquared();
-                float lenB = (b2 - b1).LengthSquared();
-
-                if ((ia + 1 < a.Count && (ib + 1 == b.Count || lenA < lenB)))
+                if (seen.Add(v2))
                 {
-                    st.AddVertex(a1);
-                    st.AddVertex(b1);
-                    st.AddVertex(a2);
-                    ia++;
-                }
-                else
-                {
-                    st.AddVertex(a1);
-                    st.AddVertex(b1);
-                    st.AddVertex(b2);
-                    ib++;
+                    points3D.Add(p);
+                    points2D.Add(v2);
                 }
             }
         }
 
+        if (points2D.Count < 3) return;
+
+        var indices = Geometry2D.TriangulatePolygon(points2D.ToArray());
+
+        if (indices.Length < 3)
+        {
+            GD.PrintErr("[FaceNode] Triangulation failed.");
+            return;
+        }
+
+        var st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+
+        foreach (int i in indices)
+            st.AddVertex(points3D[i]);
+
         _mesh.ClearSurfaces();
         st.Commit(_mesh);
     }
-    
+
     public void UpdateFace()
     {
         GenerateFaceMesh();

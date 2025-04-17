@@ -227,6 +227,21 @@ public partial class MeshBuilderNode : Node3D
         if (ImGui.Button("Rebuild Mesh"))
             GenerateMeshFromChildren();
 
+        if (ImGui.Button("Add Triangle"))
+        {
+            ClearMesh();
+            GenerateTriangle(Vector3.Zero);
+        }
+
+
+        if (ImGui.Button("Add Square"))
+        {
+            ClearMesh();
+            GenerateSquare(Vector3.Zero);
+        }
+            
+
+
         ImGui.End();
     }
 
@@ -242,11 +257,23 @@ public partial class MeshBuilderNode : Node3D
 
     public void AddEdge(PointNode a, PointNode b)
     {
+        if (EdgeExists(a, b))
+            return;
+
         var edge = new EdgeNode();
         edge.SetPoints(a, b);
         AddChild(edge);
         _edges.Add(edge);
     }
+
+    
+    public bool EdgeExists(PointNode a, PointNode b)
+    {
+        return _edges.Any(e =>
+            (e.PointA == a && e.PointB == b) ||
+            (e.PointA == b && e.PointB == a));
+    }
+
 
     public void GenerateMeshFromChildren()
     {
@@ -304,4 +331,70 @@ public partial class MeshBuilderNode : Node3D
         }
         else GD.Print("Not a closed loop.");
     }
+    
+    
+    //
+    public void GenerateTriangle(Vector3 center, float size = 1f)
+    {
+        Vector3 a = center + new Vector3(0, size, 0);
+        Vector3 b = center + new Vector3(-size * 0.866f, -size * 0.5f, 0);
+        Vector3 c = center + new Vector3(size * 0.866f, -size * 0.5f, 0);
+
+        var p0 = CreatePoint(a);
+        var p1 = CreatePoint(b);
+        var p2 = CreatePoint(c);
+
+        AddEdge(p0, p1);
+        AddEdge(p1, p2);
+        AddEdge(p2, p0);
+
+        AutoGenerateFace();
+    }
+
+    public void GenerateSquare(Vector3 center, float size = 1f)
+    {
+        float half = size / 2f;
+        Vector3 a = center + new Vector3(-half, half, 0);
+        Vector3 b = center + new Vector3(half, half, 0);
+        Vector3 c = center + new Vector3(half, -half, 0);
+        Vector3 d = center + new Vector3(-half, -half, 0);
+
+        var p0 = CreatePoint(a);
+        var p1 = CreatePoint(b);
+        var p2 = CreatePoint(c);
+        var p3 = CreatePoint(d);
+
+        AddEdge(p0, p1);
+        AddEdge(p1, p2);
+        AddEdge(p2, p3);
+        AddEdge(p3, p0);
+
+        AutoGenerateFace();
+    }
+
+    private PointNode CreatePoint(Vector3 pos)
+    {
+        var point = new PointNode
+        {
+            Position = pos,
+            Label = $"P{GetChildren().OfType<PointNode>().Count()}"
+        };
+        AddChild(point);
+        return point;
+    }
+    
+    public void ClearMesh()
+    {
+        foreach (var child in GetChildren().OfType<PointNode>().ToList())
+            child.QueueFree();
+        foreach (var child in _edges)
+            child.QueueFree();
+        foreach (var face in _faces)
+            face.QueueFree();
+
+        _edges.Clear();
+        _faces.Clear();
+    }
+
+
 }
