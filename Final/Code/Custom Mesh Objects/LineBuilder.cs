@@ -73,8 +73,41 @@ public class LineBuilder
                 ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
             }
         };
+
+        // Add a StaticBody3D for picking support
+        var body = new StaticBody3D();
+    
+        // Add a capsule or multiple small spheres along the line
+        // You could also dynamically compute a convex shape from the points if needed
+        for (int i = 0; i < Points.Count - 1; i++)
+        {
+            var a = Points[i];
+            var b = Points[i + 1];
+            var mid = (a + b) * 0.5f;
+            var dir = b - a;
+            var length = dir.Length();
+
+            var capsule = new CollisionShape3D();
+            capsule.Shape = new CapsuleShape3D
+            {
+                Radius = 0.05f,
+                Height = MathF.Max(0.01f, length - 0.1f) // Prevent negative or zero height
+            };
+
+
+            // Capsule shape is aligned along Y by default
+            var transform = new Transform3D();
+            transform.Origin = mid;
+            transform.Basis = Basis.LookingAt(dir.Normalized(), Vector3.Up);
+
+            capsule.Transform = transform;
+            body.AddChild(capsule);
+        }
+
+        instance.AddChild(body);
         return instance;
     }
+
 }
 
 

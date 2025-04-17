@@ -73,7 +73,7 @@ private void DrawPointList()
         _owner.PendingReorderFrom = -1;
         _owner.PendingReorderTo = -1;
 
-        _owner.SelectedPointIndex = -1; 
+        _owner.SelectedPointIndex = -1; // reset selection on reorder
         _owner.GenerateMeshFromPoints();
     }
 
@@ -146,7 +146,7 @@ private void DrawPointList()
 
 
    private bool _editingInInspector = false;
-private ControlPoint? _preImGuiEditSnapshot = null;
+private CustomMeshObject.ControlPoint? _preImGuiEditSnapshot = null;
 
 private void DrawInspector()
 {
@@ -213,19 +213,35 @@ private void DrawInspector()
     ImGui.End();
 }
 
-    private void DrawEdgeInspector()
+private void DrawEdgeInspector()
+{
+    if (_owner.SelectedEdgeIndex >= 0 && _owner.SelectedEdgeIndex < _owner._edges.Count)
     {
-        if (_owner.SelectedEdgeIndex >= 0 && _owner.SelectedEdgeIndex < _owner._edges.Count)
-        {
-            var edge = _owner._edges[_owner.SelectedEdgeIndex];
-            if (ImGui.Begin("Selected Edge"))
-            {
-                ImGui.Text($"Editing Edge {_owner.SelectedEdgeIndex}");
-            }
-            ImGui.End();
-        }
+        var edge = _owner._edges[_owner.SelectedEdgeIndex];
 
+        if (ImGui.Begin("Selected Edge"))
+        {
+            ImGui.Text($"Editing Edge {_owner.SelectedEdgeIndex}");
+
+            float curve = edge.CurveAmount;
+            if (ImGui.SliderFloat("Curve Amount", ref curve, -5f, 5f))
+            {
+                edge.CurveAmount = curve;
+                edge.DrawLine(); // redraw with new curve
+            }
+
+            int segments = edge.SegmentCount;
+            if (ImGui.SliderInt("Segments", ref segments, 2, 64))
+            {
+                edge.SegmentCount = segments;
+                edge.DrawLine();
+            }
+        }
+        
+        ImGui.End();
     }
+}
+
 
 
 }

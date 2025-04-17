@@ -5,21 +5,6 @@ using System.Text;
 using Gizmo3DPlugin;
 using ImGuiNET;
 
-public  struct ControlPoint
-{
-    public string Label;
-    public Vector3 Position;
-    public Basis Rotation;
-    public Vector3 Scale;
-
-    public Transform3D ToTransform()
-    {
-        return new Transform3D(Rotation.Scaled(Scale), Position);
-    }
-        
-}
-
-
 public partial class CustomMeshObject : Node
 {
     private ImmediateMesh _mesh = new ImmediateMesh();
@@ -52,8 +37,6 @@ public partial class CustomMeshObject : Node
     public int PendingReorderFrom { get => _pendingReorderFrom; set => _pendingReorderFrom = value; }
     public int PendingReorderTo { get => _pendingReorderTo; set => _pendingReorderTo = value; }
     
-    private PointGenerator _pointGenerator;
-    
     private CustomMeshObject_UI _ui;
     
     public List<LineBuilder> _edges = new();
@@ -66,7 +49,22 @@ public partial class CustomMeshObject : Node
         get => _selectedEdgeIndex;
         set => _selectedEdgeIndex = value;
     }
+
     
+    public  struct ControlPoint
+    {
+        public string Label;
+        public Vector3 Position;
+        public Basis Rotation;
+        public Vector3 Scale;
+
+        public Transform3D ToTransform()
+        {
+            return new Transform3D(Rotation.Scaled(Scale), Position);
+        }
+        
+    }
+
     public enum EditAction
     {
         Move,
@@ -297,7 +295,7 @@ public partial class CustomMeshObject : Node
 
         
     }
-
+    
     private void AttachGizmoToSelected()
     {
         for (int i = 0; i < _debugSpheres.Count; i++)
@@ -403,38 +401,37 @@ public partial class CustomMeshObject : Node
     
     private void GenerateEdgesFromPoints()
     {
-        // Clean up old edges
+        // Free old mesh instances, but keep LineBuilders
         foreach (var mesh in _edgeMeshes)
             if (IsInstanceValid(mesh))
                 mesh.QueueFree();
 
-        _edges.Clear();
         _edgeMeshes.Clear();
 
-        if (_points.Count < 2)
-            return;
-
         int edgeCount = _points.Count;
+        if (edgeCount < 2) return;
+
+        // Ensure we have the same number of LineBuilders
+        while (_edges.Count < edgeCount)
+            _edges.Add(new LineBuilder());
+        while (_edges.Count > edgeCount)
+            _edges.RemoveAt(_edges.Count - 1);
 
         for (int i = 0; i < edgeCount; i++)
         {
-            int nextIndex = (i + 1) % edgeCount; // Wrap around to close loop
+            int nextIndex = (i + 1) % edgeCount;
             Vector3 start = _points[i].Position;
             Vector3 end = _points[nextIndex].Position;
 
-            var line = new LineBuilder();
+            var line = _edges[i]; // reuse existing
             line.SetEndpoints(start, end);
-            line.CurveAmount = 0.0f; // optional tweak
-            line.DrawLine(); // This will draw the extruded face dynamically
+            line.DrawLine(); // keeps existing curve/segment values
 
             var mesh = line.CreateMeshInstance();
             AddChild(mesh);
-
-            _edges.Add(line);
             _edgeMeshes.Add(mesh);
         }
     }
-
 
 
 
