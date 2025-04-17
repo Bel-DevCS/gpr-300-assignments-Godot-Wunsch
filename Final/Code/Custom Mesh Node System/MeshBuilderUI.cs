@@ -24,6 +24,9 @@ public class MeshBuilderUI
         DrawEdgeEditor();
         DrawFaceEditor();
         DrawMeshActions();
+        
+        DrawLooping();
+
     }
 
     private void DrawPointEditor()
@@ -98,18 +101,7 @@ public class MeshBuilderUI
     private void DrawFaceEditor()
     {
         if (!ImGui.Begin("Face Editor")) return;
-
-        if (ImGui.Button("Add Face (All Edges)"))
-        {
-            var face = new FaceNode();
-            foreach (var edge in _node.GetEdges())
-                face.AddEdge(edge);
-            _node.AddFace(face);
-        }
-
-        if (ImGui.Button("Auto-Generate Face (Loop)"))
-            _node.AutoGenerateFace();
-
+        
         var faces = _node.GetFaces();
         for (int i = 0; i < faces.Count; i++)
         {
@@ -125,7 +117,13 @@ public class MeshBuilderUI
             var c = new System.Numerics.Vector4(color.R, color.G, color.B, color.A);
             if (ImGui.ColorEdit4("Face Color", ref c))
                 _selectedFace.FaceColor = new Color(c.X, c.Y, c.Z, c.W);
+
+            if (ImGui.Button("Flip Face"))
+            {
+                _selectedFace.Flip();
+            }
         }
+
 
         ImGui.End();
     }
@@ -154,4 +152,85 @@ public class MeshBuilderUI
 
         ImGui.End();
     }
+    
+   private void DrawLooping()
+{
+    if (!ImGui.Begin("Loop Builder")) return;
+
+    var loop = _node.SelectedLoop;
+    if (loop.Count == 0)
+    {
+        ImGui.Text("Shift-click points to add them to loop.");
+    }
+    else
+    {
+        for (int i = 0; i < loop.Count; i++)
+        {
+            var current = loop[i];
+            var next = loop[(i + 1) % loop.Count];
+            ImGui.Text($"{current.Label} → {next.Label}");
+        }
+
+        if (ImGui.Button("Create Loop Edges"))
+        {
+            for (int i = 0; i < loop.Count; i++)
+            {
+                var a = loop[i];
+                var b = loop[(i + 1) % loop.Count];
+                _node.AddEdge(a, b);
+            }
+            _node.ClearLoopSelection();
+        }
+
+        if (ImGui.Button("Cancel Loop"))
+        {
+            _node.ClearLoopSelection();
+        }
+
+        ImGui.Separator();
+
+        // ✅ Show "Add Face" button only if loop is valid
+        if (_node.IsLoopClosed())
+        {
+            if (ImGui.Button("Add Face from Loop"))
+            {
+                // Step 1: Create or ensure edges between looped points (with auto-close)
+                for (int i = 0; i < loop.Count; i++)
+                {
+                    var a = loop[i];
+                    var b = loop[(i + 1) % loop.Count];
+                    _node.AddEdge(a, b);
+                }
+
+                // Step 2: Create new FaceNode
+                var face = new FaceNode();
+
+                // Step 3: Add edges that match loop
+                var loopSet = loop.ToHashSet();
+                foreach (var edge in _node.GetEdges())
+                {
+                    if (loopSet.Contains(edge.PointA) && loopSet.Contains(edge.PointB))
+                        face.AddEdge(edge);
+                }
+
+                if (!_node.FaceExists(face))
+                {
+                    _node.AddFace(face);
+                    _node.ClearLoopSelection();
+                }
+                else
+                {
+                    ImGui.Text("Face already exists!");
+                }
+            }
+        }
+        else
+        {
+            ImGui.Text("Loop is not closed.");
+        }
+    }
+
+    ImGui.End();
+}
+
 }

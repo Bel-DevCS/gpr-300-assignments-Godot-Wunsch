@@ -1,14 +1,17 @@
 ﻿using Godot;
 using System.Collections.Generic;
+using System.Linq;
 
 [Tool]
 public partial class FaceNode : Node3D
 {
     public List<EdgeNode> Edges { get; private set; } = new();
-    
+
     private ArrayMesh _mesh = new ArrayMesh();
     private MeshInstance3D _meshInstance;
     private StandardMaterial3D _material;
+
+    private bool _isFlipped = false;
 
     public Color FaceColor
     {
@@ -22,8 +25,10 @@ public partial class FaceNode : Node3D
 
     public override void _Ready()
     {
-        _meshInstance = new MeshInstance3D();
-        _meshInstance.Mesh = _mesh;
+        _meshInstance = new MeshInstance3D
+        {
+            Mesh = _mesh
+        };
 
         _material = new StandardMaterial3D
         {
@@ -51,6 +56,17 @@ public partial class FaceNode : Node3D
     {
         Edges.Clear();
         GenerateFaceMesh();
+    }
+
+    public void UpdateFace()
+    {
+        GenerateFaceMesh();
+    }
+
+    public void Flip()
+    {
+        _isFlipped = !_isFlipped;
+        UpdateFace();
     }
 
     public void GenerateFaceMesh()
@@ -87,15 +103,23 @@ public partial class FaceNode : Node3D
 
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);
-        foreach (int i in indices)
-            st.AddVertex(points3D[i]);
+
+        if (_isFlipped)
+        {
+            for (int i = 0; i < indices.Length; i += 3)
+            {
+                st.AddVertex(points3D[indices[i]]);
+                st.AddVertex(points3D[indices[i + 2]]);
+                st.AddVertex(points3D[indices[i + 1]]);
+            }
+        }
+        else
+        {
+            for (int i = 0; i < indices.Length; i++)
+                st.AddVertex(points3D[indices[i]]);
+        }
 
         _mesh.ClearSurfaces();
         st.Commit(_mesh);
-    }
-
-    public void UpdateFace()
-    {
-        GenerateFaceMesh();
     }
 }

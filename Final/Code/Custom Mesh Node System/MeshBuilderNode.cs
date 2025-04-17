@@ -24,6 +24,17 @@ public partial class MeshBuilderNode : Node3D
     private int _edgePointBIndex = 1;
 
     private MeshBuilderUI _meshBuilderUI;
+    
+    private List<PointNode> _loopSelection = new();
+
+    public IReadOnlyList<PointNode> SelectedLoop => _loopSelection;
+    public void ClearLoopSelection()
+    {
+        foreach (var p in _loopSelection)
+            p.SetColor(new Color(1, 0, 0)); // back to red
+        _loopSelection.Clear();
+    }
+
 
     public override void _Ready()
     {
@@ -49,15 +60,16 @@ public partial class MeshBuilderNode : Node3D
         if (@event is InputEventKey keyEvent && keyEvent.Pressed && keyEvent.Keycode == Key.Escape)
         {
             DeselectPoint();
+            ClearLoopSelection(); // also clear shift-loop
         }
 
         if (@event is InputEventMouseButton mouseEvent && mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Left)
         {
-            TrySelectPoint(mouseEvent.Position);
+            TrySelectPoint(mouseEvent.Position, Input.IsKeyPressed(Key.Shift));
         }
     }
 
-    public void TrySelectPoint(Vector2 mousePos)
+    public void TrySelectPoint(Vector2 mousePos, bool isShiftClick = false)
     {
         var camera = GetViewport().GetCamera3D();
         if (camera == null) return;
@@ -75,12 +87,24 @@ public partial class MeshBuilderNode : Node3D
             {
                 if (collider.IsAncestorOf(point) || point.IsAncestorOf(collider))
                 {
-                    SelectPoint(point);
+                    if (isShiftClick)
+                    {
+                        if (!_loopSelection.Contains(point))
+                        {
+                            _loopSelection.Add(point);
+                            point.SetColor(Colors.Cyan);
+                        }
+                    }
+                    else
+                    {
+                        SelectPoint(point);
+                    }
                     return;
                 }
             }
         }
     }
+
 
     public void SelectPoint(PointNode point)
     {
@@ -160,6 +184,24 @@ public partial class MeshBuilderNode : Node3D
             return sameRef || samePos;
         });
     }
+    
+    public bool FaceExists(FaceNode candidate)
+    {
+        var candidateEdges = candidate.Edges.ToHashSet();
+
+        foreach (var face in _faces)
+        {
+            if (face.Edges.Count != candidateEdges.Count)
+                continue;
+
+            // Check if all edges match (unordered)
+            if (face.Edges.All(e => candidateEdges.Contains(e)))
+                return true;
+        }
+
+        return false;
+    }
+
 
 
 
@@ -311,5 +353,25 @@ public partial class MeshBuilderNode : Node3D
         AddChild(face);
         _faces.Add(face);
     }
+
+    public bool IsLoopClosed()
+    {
+        if (_loopSelection.Count < 3)
+            return false;
+
+        for (int i = 0; i < _loopSelection.Count; i++)
+        {
+            var a = _loopSelection[i];
+            var b = _loopSelection[(i + 1) % _loopSelection.Count];
+
+            if (!EdgeExists(a, b))
+                return false;
+        }
+
+        return true;
+    }
+
+
+
 
 }
