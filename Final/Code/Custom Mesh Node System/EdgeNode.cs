@@ -1,10 +1,13 @@
 ﻿using Godot;
 using System;
+using System.Collections.Generic;
 
 public partial class EdgeNode : Node3D
 {
-    public PointNode PointA { get; set; }
-    public PointNode PointB { get; set; }
+    public PointNode PointA { get; private set; }
+    public PointNode PointB { get; private set; }
+
+    public List<FaceNode> ConnectedFaces { get; private set; } = new();
 
     public LineBuilder Line { get; private set; } = new LineBuilder();
     private MeshInstance3D _lineMesh;
@@ -41,8 +44,9 @@ public partial class EdgeNode : Node3D
         AddChild(_lineMesh);
     }
 
-    public Vector3[] GetSegmentPoints()
+    public void RegisterFace(FaceNode face)
     {
-        return Line.Points.ToArray(); // Useful for face mesh generation
+        if (!ConnectedFaces.Contains(face))
+            ConnectedFaces.Add(face);
     }
 }

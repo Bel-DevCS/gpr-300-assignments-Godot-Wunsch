@@ -14,6 +14,8 @@ public partial class MeshBuilderNode : Node3D
     private List<FaceNode> _faces = new();
 
     private PointNode _selectedPoint = null;
+    private EdgeNode _selectedEdge = null;
+
     private Vector3 _dragStartPos;
     private Gizmo3D _gizmo;
 
@@ -39,19 +41,16 @@ public partial class MeshBuilderNode : Node3D
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        // Escape to deselect
         if (@event is InputEventKey keyEvent && keyEvent.Pressed && keyEvent.Keycode == Key.Escape)
         {
             DeselectPoint();
         }
 
-        // Left-click for gizmo selection
         if (@event is InputEventMouseButton mouseEvent && mouseEvent.Pressed && mouseEvent.ButtonIndex == MouseButton.Left)
         {
             TrySelectPoint(mouseEvent.Position);
         }
     }
-
 
     private void TrySelectPoint(Vector2 mousePos)
     {
@@ -80,22 +79,17 @@ public partial class MeshBuilderNode : Node3D
 
     private void SelectPoint(PointNode point)
     {
-        // Deselect old
         DeselectPoint();
-
-        // Select new
         _selectedPoint = point;
         _dragStartPos = point.Position;
         _gizmo.GlobalTransform = point.GlobalTransform;
         _gizmo.Select(point);
 
-        // Auto-assign PointA in Edge Linker
         var points = GetChildren().OfType<PointNode>().ToList();
         int index = points.IndexOf(point);
         if (index >= 0)
             _edgePointAIndex = index;
     }
-
 
     private void DeselectPoint()
     {
@@ -109,18 +103,27 @@ public partial class MeshBuilderNode : Node3D
     {
         if (_selectedPoint != null)
         {
+            // Update the actual point’s position based on gizmo
             _selectedPoint.Position = _selectedPoint.GlobalPosition;
 
-            // Update all edges that reference the selected point
+            // Rebuild any edges connected to this point
             foreach (var edge in _edges)
             {
                 if (edge.PointA == _selectedPoint || edge.PointB == _selectedPoint)
+                {
                     edge.UpdateEdge();
+
+                    // Rebuild any faces using this edge
+                    foreach (var face in edge.ConnectedFaces)
+                    {
+                        face.UpdateFace();
+                    }
+                }
             }
         }
     }
 
-    // === ImGui UI ===
+
     private void DrawEditor()
     {
         DrawPointEditor();
@@ -172,8 +175,28 @@ public partial class MeshBuilderNode : Node3D
         }
         else ImGui.Text("Need 2+ points.");
 
+        ImGui.Separator();
+        if (_edges.Count > 0)
+        {
+            for (int i = 0; i < _edges.Count; i++)
+            {
+                bool selected = (_selectedEdge == _edges[i]);
+                if (ImGui.Selectable($"Edge {i}: {_edges[i].PointA.Label} → {_edges[i].PointB.Label}", selected))
+                    _selectedEdge = _edges[i];
+            }
+
+            if (_selectedEdge != null)
+            {
+                _selectedEdge.Line.DrawImGui(); 
+                _selectedEdge.UpdateEdge();
+                foreach (var face in _selectedEdge.ConnectedFaces)
+                    face.UpdateFace();
+            }
+        }
+
         ImGui.End();
     }
+
 
     private void DrawFaceEditor()
     {
@@ -207,7 +230,6 @@ public partial class MeshBuilderNode : Node3D
         ImGui.End();
     }
 
-    // === Point/Edge/Face Creation ===
     public void AddPoint(Vector3 pos)
     {
         var point = new PointNode

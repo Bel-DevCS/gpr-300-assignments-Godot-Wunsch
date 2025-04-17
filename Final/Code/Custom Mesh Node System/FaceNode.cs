@@ -28,9 +28,11 @@ public partial class FaceNode : Node3D
         if (!Edges.Contains(edge))
         {
             Edges.Add(edge);
-            GenerateFaceMesh();
+            edge.RegisterFace(this);
+            UpdateFace();
         }
     }
+
 
     public void ClearEdges()
     {
@@ -86,4 +88,10 @@ public partial class FaceNode : Node3D
         _mesh.ClearSurfaces();
         st.Commit(_mesh);
     }
+    
+    public void UpdateFace()
+    {
+        GenerateFaceMesh();
+    }
+
 }
