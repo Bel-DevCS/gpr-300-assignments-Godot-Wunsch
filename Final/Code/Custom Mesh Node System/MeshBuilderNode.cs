@@ -371,6 +371,15 @@ public partial class MeshBuilderNode : Node3D
         return true;
     }
 
+    public void AddToLoopSelection(PointNode point)
+    {
+        if (!_loopSelection.Contains(point))
+        {
+            _loopSelection.Add(point);
+            point.SetColor(Colors.Cyan);
+        }
+    }
+
 
 
 

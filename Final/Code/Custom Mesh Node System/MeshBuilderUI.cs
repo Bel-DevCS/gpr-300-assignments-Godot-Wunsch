@@ -13,6 +13,9 @@ public class MeshBuilderUI
     private int _edgePointAIndex = 0;
     private int _edgePointBIndex = 1;
 
+    private PointNode _currentlyRenaming = null;
+
+    
     public MeshBuilderUI(MeshBuilderNode node)
     {
         _node = node;
@@ -26,6 +29,7 @@ public class MeshBuilderUI
         DrawMeshActions();
         
         DrawLooping();
+        DrawHierarchy();
 
     }
 
@@ -232,5 +236,57 @@ public class MeshBuilderUI
 
     ImGui.End();
 }
+   
+private void DrawHierarchy()
+{
+    if (!ImGui.Begin("Hierarchy")) return;
+
+    ImGui.Text("Points:");
+    ImGui.Separator();
+
+    var points = _node.GetPoints();
+    foreach (var point in points)
+    {
+        bool isSelected = (_node.SelectedPoint == point);
+        ImGui.PushID((int)point.GetInstanceId());
+
+        if (_currentlyRenaming == point)
+        {
+            byte[] buffer = new byte[32];
+            byte[] nameBytes = System.Text.Encoding.UTF8.GetBytes(point.Label);
+            Array.Copy(nameBytes, buffer, Math.Min(buffer.Length, nameBytes.Length));
+
+            if (ImGui.InputText("##rename", buffer, (uint)buffer.Length, ImGuiInputTextFlags.EnterReturnsTrue))
+            {
+                point.Label = System.Text.Encoding.UTF8.GetString(buffer).TrimEnd('\0');
+                _currentlyRenaming = null;
+            }
+
+            // Only cancel if user clicks away
+            if (!ImGui.IsItemActive() && ImGui.GetIO().MouseClicked[0])
+                _currentlyRenaming = null;
+        }
+
+        else
+        {
+            if (ImGui.Selectable(point.Label, isSelected))
+            {
+                if (ImGui.GetIO().KeyShift)
+                    _node.AddToLoopSelection(point);
+                else
+                    _node.SelectPoint(point);
+            }
+
+            // CTRL + click to rename
+            if (ImGui.IsItemHovered() && ImGui.IsMouseClicked(0) && ImGui.GetIO().KeyCtrl)
+                _currentlyRenaming = point;
+        }
+
+        ImGui.PopID();
+    }
+
+    ImGui.End();
+}
+
 
 }
