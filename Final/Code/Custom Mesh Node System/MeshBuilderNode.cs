@@ -183,7 +183,10 @@ public partial class MeshBuilderNode : Node3D
                 bool selected = (_selectedEdge == _edges[i]);
                 if (ImGui.Selectable($"Edge {i}: {_edges[i].PointA.Label} → {_edges[i].PointB.Label}", selected))
                     _selectedEdge = _edges[i];
+
+                _edges[i].SetHighlighted(selected);
             }
+
 
             if (_selectedEdge != null)
             {
@@ -270,9 +273,14 @@ public partial class MeshBuilderNode : Node3D
     public bool EdgeExists(PointNode a, PointNode b)
     {
         return _edges.Any(e =>
-            (e.PointA == a && e.PointB == b) ||
-            (e.PointA == b && e.PointB == a));
+        {
+            bool sameRef = (e.PointA == a && e.PointB == b) || (e.PointA == b && e.PointB == a);
+            bool samePos = (e.PointA.Position == a.Position && e.PointB.Position == b.Position) ||
+                           (e.PointA.Position == b.Position && e.PointB.Position == a.Position);
+            return sameRef || samePos;
+        });
     }
+
 
 
     public void GenerateMeshFromChildren()
@@ -354,35 +362,48 @@ public partial class MeshBuilderNode : Node3D
     public void GenerateSquare(Vector3 center, float size = 1f)
     {
         float half = size / 2f;
+
         Vector3 a = center + new Vector3(-half, half, 0);
         Vector3 b = center + new Vector3(half, half, 0);
         Vector3 c = center + new Vector3(half, -half, 0);
         Vector3 d = center + new Vector3(-half, -half, 0);
 
-        var p0 = CreatePoint(a);
-        var p1 = CreatePoint(b);
-        var p2 = CreatePoint(c);
-        var p3 = CreatePoint(d);
+        int baseIndex = GetChildren().OfType<PointNode>().Count();
 
-        AddEdge(p0, p1);
-        AddEdge(p1, p2);
-        AddEdge(p2, p3);
-        AddEdge(p3, p0);
+        var p0 = CreatePoint(a, baseIndex + 0);
+        var p1 = CreatePoint(b, baseIndex + 1);
+        var p2 = CreatePoint(c, baseIndex + 2);
+        var p3 = CreatePoint(d, baseIndex + 3);
+
+        TryAddEdge(p0, p1);
+        TryAddEdge(p1, p2);
+        TryAddEdge(p2, p3);
+        TryAddEdge(p3, p0);
 
         AutoGenerateFace();
     }
 
-    private PointNode CreatePoint(Vector3 pos)
+    private void TryAddEdge(PointNode a, PointNode b)
     {
+        if (EdgeExists(a, b))
+            GD.Print($"[EdgeExists] Skipping edge {a.Label} → {b.Label}");
+        else
+            AddEdge(a, b);
+    }
+
+
+    private PointNode CreatePoint(Vector3 pos, int? index = null)
+    {
+        var count = index ?? GetChildren().OfType<PointNode>().Count();
         var point = new PointNode
         {
             Position = pos,
-            Label = $"P{GetChildren().OfType<PointNode>().Count()}"
+            Label = $"P{count}"
         };
         AddChild(point);
         return point;
     }
-    
+
     public void ClearMesh()
     {
         foreach (var child in GetChildren().OfType<PointNode>().ToList())

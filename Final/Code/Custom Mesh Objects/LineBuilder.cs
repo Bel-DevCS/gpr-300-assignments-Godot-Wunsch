@@ -22,6 +22,7 @@ public class LineBuilder
     private Vector3 _startPoint;
     private Vector3 _endPoint;
     private ImmediateMesh _mesh;
+    public ImmediateMesh GetImmediateMesh() => _mesh;
 
     public CurveMode Mode = CurveMode.Quadratic;
     public int SegmentCount = 16;
@@ -74,6 +75,9 @@ public class LineBuilder
 
    private Vector3 GetPointAlongLine(float t)
 {
+        if (t == 0) return _startPoint;
+        if (t == 1) return _endPoint;
+    
     switch (Mode)
     {
         case CurveMode.Linear:
@@ -174,44 +178,49 @@ public void DrawImGui()
     }
 }
 
-    public MeshInstance3D CreateMeshInstance()
+public MeshInstance3D CreateMeshInstance()
+{
+    var instance = new MeshInstance3D
     {
-        var instance = new MeshInstance3D
+        Mesh = _mesh,
+        MaterialOverride = new StandardMaterial3D
         {
-            Mesh = _mesh,
-            MaterialOverride = new StandardMaterial3D
+            AlbedoColor = Colors.Yellow,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
+        }
+    };
+
+    var body = new StaticBody3D();
+
+    for (int i = 0; i < Points.Count - 1; i++)
+    {
+        var a = Points[i];
+        var b = Points[i + 1];
+        var mid = (a + b) * 0.5f;
+        var dir = b - a;
+        var length = dir.Length();
+        var forward = dir.Normalized();
+
+        // Fallback up vector if dir is nearly vertical
+        Vector3 up = Mathf.Abs(forward.Dot(Vector3.Up)) > 0.99f ? Vector3.Forward : Vector3.Up;
+
+        var capsule = new CollisionShape3D
+        {
+            Shape = new CapsuleShape3D
             {
-                AlbedoColor = Colors.Yellow,
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded
-            }
+                Radius = 0.05f,
+                Height = MathF.Max(0.01f, length - 0.1f)
+            },
+            Transform = new Transform3D(Basis.LookingAt(forward, up), mid)
         };
 
-        var body = new StaticBody3D();
-
-        for (int i = 0; i < Points.Count - 1; i++)
-        {
-            var a = Points[i];
-            var b = Points[i + 1];
-            var mid = (a + b) * 0.5f;
-            var dir = b - a;
-            var length = dir.Length();
-
-            var capsule = new CollisionShape3D
-            {
-                Shape = new CapsuleShape3D
-                {
-                    Radius = 0.05f,
-                    Height = MathF.Max(0.01f, length - 0.1f)
-                },
-                Transform = new Transform3D(Basis.LookingAt(dir.Normalized(), Vector3.Up), mid)
-            };
-
-            body.AddChild(capsule);
-        }
-
-        instance.AddChild(body);
-        return instance;
+        body.AddChild(capsule);
     }
+
+    instance.AddChild(body);
+    return instance;
+}
+
 }
 
 
