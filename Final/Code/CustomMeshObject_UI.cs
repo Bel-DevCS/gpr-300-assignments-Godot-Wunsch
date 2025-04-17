@@ -74,7 +74,7 @@ private void DrawPointList()
         _owner.PendingReorderTo = -1;
 
         _owner.SelectedPointIndex = -1; // reset selection on reorder
-        _owner.GenerateMeshFromPoints();
+        _owner.GenerateFaceMesh();
     }
 
     if (_owner.SelectedPointIndex >= _owner.Points.Count)

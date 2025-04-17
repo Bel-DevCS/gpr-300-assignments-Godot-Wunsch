@@ -7,7 +7,8 @@ using ImGuiNET;
 
 public partial class CustomMeshObject : Node
 {
-    private ImmediateMesh _mesh = new ImmediateMesh();
+    private ArrayMesh _mesh = new ArrayMesh();
+
     private MeshInstance3D _meshInstance;
 
     private List<ControlPoint> _points = new();
@@ -120,7 +121,7 @@ public partial class CustomMeshObject : Node
         if (!_editingInInspector)
             UpdatePointsFromDebugSpheres();
 
-        GenerateMeshFromPoints();
+        GenerateFaceMesh();
         GenerateEdgesFromPoints();
 
         _ui.DrawEditor();
@@ -209,7 +210,10 @@ public partial class CustomMeshObject : Node
                 case Key.Key1: _gizmo.Mode = Gizmo3D.ToolMode.Move; break;
                 case Key.Key2: _gizmo.Mode = Gizmo3D.ToolMode.Rotate; break;
                 case Key.Key3: _gizmo.Mode = Gizmo3D.ToolMode.Scale; break;
-                case Key.Escape: DeselectSphere(); break;
+                case Key.Escape: 
+                    DeselectSphere();
+                    DeselectEdge();
+                    break;
             }
         }
     }
@@ -250,7 +254,7 @@ public partial class CustomMeshObject : Node
         if (camera == null) return;
 
         Vector3 origin = camera.ProjectRayOrigin(mousePos);
-        Vector3 direction = camera.ProjectRayNormal(mousePos) * 1000f;
+        Vector3 direction = camera.ProjectRayNormal(mousePos) * 3000f;
 
         var spaceState = GetViewport().GetWorld3D().DirectSpaceState;
         var query = PhysicsRayQueryParameters3D.Create(origin, origin + direction);
@@ -340,65 +344,7 @@ public partial class CustomMeshObject : Node
             basis.Z.Length()
         );
     }
-    public void GenerateMeshFromPoints()
-    {
-        _mesh.ClearSurfaces();
-        _mesh.SurfaceBegin(Mesh.PrimitiveType.Triangles);
 
-        int count = _points.Count;
-
-        if (count == 1)
-        {
-            Vector3 p = _points[0].Position;
-            float size = _thickness;
-
-            _mesh.SurfaceAddVertex(p + new Vector3(size, 0, 0));
-            _mesh.SurfaceAddVertex(p + new Vector3(0, size, 0));
-            _mesh.SurfaceAddVertex(p + new Vector3(0, 0, size));
-        }
-        else if (count == 2)
-        {
-            var a = _points[0].Position;
-            var b = _points[1].Position;
-            var up = Vector3.Up;
-            var right = (b - a).Cross(up).Normalized() * _thickness;
-
-            Vector3 p1 = a + right;
-            Vector3 p2 = a - right;
-            Vector3 p3 = b + right;
-            Vector3 p4 = b - right;
-
-            _mesh.SurfaceAddVertex(p1);
-            _mesh.SurfaceAddVertex(p2);
-            _mesh.SurfaceAddVertex(p3);
-
-            _mesh.SurfaceAddVertex(p2);
-            _mesh.SurfaceAddVertex(p4);
-            _mesh.SurfaceAddVertex(p3);
-        }
-        else if (count >= 3)
-        {
-            // Center fan triangulation
-            Vector3 center = Vector3.Zero;
-            foreach (var pt in _points)
-                center += pt.Position;
-            center /= count;
-
-            for (int i = 0; i < count; i++)
-            {
-                Vector3 a = _points[i].Position;
-                Vector3 b = _points[(i + 1) % count].Position;
-
-                _mesh.SurfaceAddVertex(center);
-                _mesh.SurfaceAddVertex(a);
-                _mesh.SurfaceAddVertex(b);
-            }
-        }
-
-        _mesh.SurfaceEnd();
-    }
-
-    
     private void GenerateEdgesFromPoints()
     {
         // Free old mesh instances, but keep LineBuilders
@@ -434,6 +380,56 @@ public partial class CustomMeshObject : Node
     }
 
 
+    public void GenerateFaceMesh()
+    {
+        if (_edges.Count < 2)
+            return;
+
+        SurfaceTool st = new SurfaceTool();
+        st.Begin(Mesh.PrimitiveType.Triangles);
+        st.SetSmoothGroup(0);
+
+        int edgeCount = _edges.Count;
+
+        for (int i = 0; i < edgeCount; i++)
+        {
+            var a = _edges[i].Points;
+            var b = _edges[(i + 1) % edgeCount].Points;
+
+            int ia = 0, ib = 0;
+
+            while (ia < a.Count - 1 || ib < b.Count - 1)
+            {
+                Vector3 a1 = a[ia];
+                Vector3 a2 = (ia + 1 < a.Count) ? a[ia + 1] : a1;
+                Vector3 b1 = b[ib];
+                Vector3 b2 = (ib + 1 < b.Count) ? b[ib + 1] : b1;
+
+                float lenA = (a2 - a1).LengthSquared();
+                float lenB = (b2 - b1).LengthSquared();
+
+                if ((ia + 1 < a.Count && (ib + 1 == b.Count || lenA < lenB)))
+                {
+                    // Advance edge A
+                    st.AddVertex(a1);
+                    st.AddVertex(b1);
+                    st.AddVertex(a2);
+                    ia++;
+                }
+                else
+                {
+                    // Advance edge B
+                    st.AddVertex(a1);
+                    st.AddVertex(b1);
+                    st.AddVertex(b2);
+                    ib++;
+                }
+            }
+        }
+
+        _mesh.ClearSurfaces();
+        st.Commit(_mesh);
+    }
 
     
     private void AddPoint(Vector3 point, bool pushUndo = true)
@@ -452,7 +448,7 @@ public partial class CustomMeshObject : Node
 
         if (_editingMode) SpawnDebugSphere(point);
         
-        GenerateMeshFromPoints();
+        GenerateFaceMesh();
         GenerateEdgesFromPoints(); 
     }
 
@@ -480,7 +476,7 @@ public partial class CustomMeshObject : Node
             _debugSpheres.RemoveAt(indexToDelete);
         }
         
-        GenerateMeshFromPoints();
+        GenerateFaceMesh();
         GenerateEdgesFromPoints();
     }
     private void ClearPoints()
@@ -581,7 +577,7 @@ public partial class CustomMeshObject : Node
                 break;
         }
 
-        GenerateMeshFromPoints();
+        GenerateFaceMesh();
         GenerateEdgesFromPoints();
     }
 
@@ -648,7 +644,7 @@ public partial class CustomMeshObject : Node
                 break;
         }
 
-        GenerateMeshFromPoints();
+        GenerateFaceMesh();
         GenerateEdgesFromPoints();
     }
 
