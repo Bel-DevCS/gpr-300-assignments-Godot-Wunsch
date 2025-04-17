@@ -102,9 +102,8 @@ public partial class CustomMeshObject : Node
         _meshInstance.MaterialOverride = mat;
         AddChild(_meshInstance);
 
-        AddPoint(new Vector3(0, 0, 0));
-        AddPoint(new Vector3(1, 0, 0));
-        AddPoint(new Vector3(2, 0, 1));
+      //Draw
+        DrawTriangle();
 
         AddChild(_gizmo);
         _gizmo.Mode = Gizmo3D.ToolMode.Move;
@@ -704,6 +703,53 @@ public partial class CustomMeshObject : Node
                 SpawnDebugSphere(cp.Position);
         }
     }
+
+    void DrawTriangle()
+    {
+        AddPoint(new Vector3(0, 0, 0));
+        AddPoint(new Vector3(1, 0, 0));
+        AddPoint(new Vector3(2, 0, 1));
+    }
+
+    void DrawCube()
+    {
+        // Bottom Face (clockwise from top-down)
+        AddPoint(new Vector3(-0.5f, -0.5f, -0.5f)); // 0
+        AddPoint(new Vector3( 0.5f, -0.5f, -0.5f)); // 1
+        AddPoint(new Vector3( 0.5f, -0.5f,  0.5f)); // 2
+        AddPoint(new Vector3(-0.5f, -0.5f,  0.5f)); // 3
+
+        // Top Face
+        AddPoint(new Vector3(-0.5f,  0.5f, -0.5f)); // 4
+        AddPoint(new Vector3( 0.5f,  0.5f, -0.5f)); // 5
+        AddPoint(new Vector3( 0.5f,  0.5f,  0.5f)); // 6
+        AddPoint(new Vector3(-0.5f,  0.5f,  0.5f)); // 7
+
+        // Front Face
+        AddPoint(new Vector3(-0.5f, -0.5f, 0.5f));  // 8
+        AddPoint(new Vector3( 0.5f, -0.5f, 0.5f));  // 9
+        AddPoint(new Vector3( 0.5f,  0.5f, 0.5f));  // 10
+        AddPoint(new Vector3(-0.5f,  0.5f, 0.5f));  // 11
+
+        // Back Face
+        AddPoint(new Vector3(-0.5f, -0.5f, -0.5f)); // 12
+        AddPoint(new Vector3( 0.5f, -0.5f, -0.5f)); // 13
+        AddPoint(new Vector3( 0.5f,  0.5f, -0.5f)); // 14
+        AddPoint(new Vector3(-0.5f,  0.5f, -0.5f)); // 15
+
+        // Left Face
+        AddPoint(new Vector3(-0.5f, -0.5f, -0.5f)); // 16
+        AddPoint(new Vector3(-0.5f, -0.5f,  0.5f)); // 17
+        AddPoint(new Vector3(-0.5f,  0.5f,  0.5f)); // 18
+        AddPoint(new Vector3(-0.5f,  0.5f, -0.5f)); // 19
+
+        // Right Face
+        AddPoint(new Vector3(0.5f, -0.5f, -0.5f));  // 20
+        AddPoint(new Vector3(0.5f, -0.5f,  0.5f));  // 21
+        AddPoint(new Vector3(0.5f,  0.5f,  0.5f));  // 22
+        AddPoint(new Vector3(0.5f,  0.5f, -0.5f));  // 23
+    }
+
 
     
     private bool IsInstanceValid(Node node) => node != null && node.IsInsideTree();

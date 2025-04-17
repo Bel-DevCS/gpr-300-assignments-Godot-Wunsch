@@ -1,12 +1,10 @@
-[gd_scene load_steps=3 format=3 uid="uid://d1ffqb8miut2d"]
+[gd_scene load_steps=2 format=3 uid="uid://d1ffqb8miut2d"]
 
-[ext_resource type="Script" uid="uid://7foanq0qib3k" path="res://Final/Code/Custom Mesh Objects/CustomMeshObject.cs" id="1_bm7mq"]
 [ext_resource type="Script" uid="uid://b6sepxffluwo2" path="res://Final/Code/Final_CameraController.cs" id="2_d10m1"]
 
 [node name="Final" type="Node3D"]
 
-[node name="Node" type="Node" parent="."]
-script = ExtResource("1_bm7mq")
-
 [node name="Camera3D" type="Camera3D" parent="."]
 script = ExtResource("2_d10m1")
+
+[node name="UI" type="Node" parent="."]
