@@ -73,7 +73,7 @@ private void DrawPointList()
         _owner.PendingReorderFrom = -1;
         _owner.PendingReorderTo = -1;
 
-        _owner.SelectedPointIndex = -1; // reset selection on reorder
+        _owner.SelectedPointIndex = -1; 
         _owner.GenerateMeshFromPoints();
     }
 
@@ -146,7 +146,7 @@ private void DrawPointList()
 
 
    private bool _editingInInspector = false;
-private CustomMeshObject.ControlPoint? _preImGuiEditSnapshot = null;
+private ControlPoint? _preImGuiEditSnapshot = null;
 
 private void DrawInspector()
 {
@@ -215,15 +215,16 @@ private void DrawInspector()
 
     private void DrawEdgeInspector()
     {
-        if (_owner.SelectedEdgeIndex < 0 || _owner.SelectedEdgeIndex  >= _owner._edges.Count)
-            return;
-
-        if (ImGui.Begin("Selected Edge"))
+        if (_owner.SelectedEdgeIndex >= 0 && _owner.SelectedEdgeIndex < _owner._edges.Count)
         {
-            ImGui.Text($"Editing Edge {_owner.SelectedEdgeIndex }");
-            _owner._edges[_owner.SelectedEdgeIndex ].DrawImGuiUI();
+            var edge = _owner._edges[_owner.SelectedEdgeIndex];
+            if (ImGui.Begin("Selected Edge"))
+            {
+                ImGui.Text($"Editing Edge {_owner.SelectedEdgeIndex}");
+            }
+            ImGui.End();
         }
-        ImGui.End();
+
     }
 
 
