@@ -7,6 +7,7 @@ using Gizmo3DPlugin;
 
 public partial class MeshBuilderNode : Node3D
 {
+    
     private ArrayMesh _mesh = new ArrayMesh();
     private MeshInstance3D _meshInstance;
 
@@ -22,10 +23,14 @@ public partial class MeshBuilderNode : Node3D
     private int _edgePointAIndex = 0;
     private int _edgePointBIndex = 1;
 
+    private MeshBuilderUI _meshBuilderUI;
+
     public override void _Ready()
     {
         _meshInstance = GetNode<MeshInstance3D>("LiveMesh");
         _meshInstance.Mesh = _mesh;
+        
+        _meshBuilderUI = new MeshBuilderUI(this);
 
         _gizmo = new Gizmo3D { Mode = Gizmo3D.ToolMode.Move };
         AddChild(_gizmo);
@@ -36,7 +41,7 @@ public partial class MeshBuilderNode : Node3D
     public override void _Process(double delta)
     {
         UpdateSelectedPointFromGizmo();
-        DrawEditor();
+        _meshBuilderUI.Draw();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -52,7 +57,7 @@ public partial class MeshBuilderNode : Node3D
         }
     }
 
-    private void TrySelectPoint(Vector2 mousePos)
+    public void TrySelectPoint(Vector2 mousePos)
     {
         var camera = GetViewport().GetCamera3D();
         if (camera == null) return;
@@ -77,7 +82,7 @@ public partial class MeshBuilderNode : Node3D
         }
     }
 
-    private void SelectPoint(PointNode point)
+    public void SelectPoint(PointNode point)
     {
         DeselectPoint();
         _selectedPoint = point;
@@ -91,7 +96,7 @@ public partial class MeshBuilderNode : Node3D
             _edgePointAIndex = index;
     }
 
-    private void DeselectPoint()
+    public void DeselectPoint()
     {
         if (_selectedPoint != null)
             _gizmo.Deselect(_selectedPoint);
@@ -99,7 +104,7 @@ public partial class MeshBuilderNode : Node3D
         _selectedPoint = null;
     }
 
-    private void UpdateSelectedPointFromGizmo()
+    public void UpdateSelectedPointFromGizmo()
     {
         if (_selectedPoint != null)
         {
@@ -122,132 +127,7 @@ public partial class MeshBuilderNode : Node3D
             }
         }
     }
-
-
-    private void DrawEditor()
-    {
-        DrawPointEditor();
-        DrawEdgeEditor();
-        DrawFaceEditor();
-        DrawMeshActions();
-    }
-
-    private void DrawPointEditor()
-    {
-        if (!ImGui.Begin("Point Editor")) return;
-
-        foreach (var point in GetChildren().OfType<PointNode>())
-        {
-            if (ImGui.Selectable(point.Label, _selectedPoint == point))
-                SelectPoint(point);
-        }
-
-        if (_selectedPoint != null)
-        {
-            var pos = _selectedPoint.Position;
-            var np = new System.Numerics.Vector3(pos.X, pos.Y, pos.Z);
-            if (ImGui.DragFloat3("Position", ref np))
-                _selectedPoint.Position = new Vector3(np.X, np.Y, np.Z);
-        }
-
-        ImGui.End();
-    }
-
-    private void DrawEdgeEditor()
-    {
-        if (!ImGui.Begin("Edge Editor")) return;
-
-        var points = GetChildren().OfType<PointNode>().ToList();
-        var labels = points.Select(p => p.Label).ToArray();
-
-        if (labels.Length >= 2)
-        {
-            ImGui.Combo("Point A", ref _edgePointAIndex, labels, labels.Length);
-            ImGui.Combo("Point B", ref _edgePointBIndex, labels, labels.Length);
-
-            if (ImGui.Button("Link Points"))
-            {
-                var a = points[_edgePointAIndex];
-                var b = points[_edgePointBIndex];
-                if (a != b)
-                    AddEdge(a, b);
-            }
-        }
-        else ImGui.Text("Need 2+ points.");
-
-        ImGui.Separator();
-        if (_edges.Count > 0)
-        {
-            for (int i = 0; i < _edges.Count; i++)
-            {
-                bool selected = (_selectedEdge == _edges[i]);
-                if (ImGui.Selectable($"Edge {i}: {_edges[i].PointA.Label} → {_edges[i].PointB.Label}", selected))
-                    _selectedEdge = _edges[i];
-
-                _edges[i].SetHighlighted(selected);
-            }
-
-
-            if (_selectedEdge != null)
-            {
-                _selectedEdge.Line.DrawImGui(); 
-                _selectedEdge.UpdateEdge();
-                foreach (var face in _selectedEdge.ConnectedFaces)
-                    face.UpdateFace();
-            }
-        }
-
-        ImGui.End();
-    }
-
-
-    private void DrawFaceEditor()
-    {
-        if (!ImGui.Begin("Face Editor")) return;
-
-        if (ImGui.Button("Add Face (All Edges)"))
-        {
-            var face = new FaceNode();
-            foreach (var edge in _edges)
-                face.AddEdge(edge);
-            AddChild(face);
-            _faces.Add(face);
-        }
-
-        if (ImGui.Button("Auto-Generate Face (Loop)"))
-            AutoGenerateFace();
-
-        ImGui.End();
-    }
-
-    private void DrawMeshActions()
-    {
-        if (!ImGui.Begin("Mesh Actions")) return;
-
-        if (ImGui.Button("Add Point"))
-            AddPoint(Vector3.Zero);
-
-        if (ImGui.Button("Rebuild Mesh"))
-            GenerateMeshFromChildren();
-
-        if (ImGui.Button("Add Triangle"))
-        {
-            ClearMesh();
-            GenerateTriangle(Vector3.Zero);
-        }
-
-
-        if (ImGui.Button("Add Square"))
-        {
-            ClearMesh();
-            GenerateSquare(Vector3.Zero);
-        }
-            
-
-
-        ImGui.End();
-    }
-
+    
     public void AddPoint(Vector3 pos)
     {
         var point = new PointNode
@@ -412,10 +292,24 @@ public partial class MeshBuilderNode : Node3D
             child.QueueFree();
         foreach (var face in _faces)
             face.QueueFree();
+        
+        DeselectPoint();
 
         _edges.Clear();
         _faces.Clear();
     }
 
+
+    public List<PointNode> GetPoints() => GetChildren().OfType<PointNode>().ToList();
+    public List<EdgeNode> GetEdges() => _edges;
+    public List<FaceNode> GetFaces() => _faces;
+
+    public PointNode SelectedPoint => _selectedPoint;
+
+    public void AddFace(FaceNode face)
+    {
+        AddChild(face);
+        _faces.Add(face);
+    }
 
 }
