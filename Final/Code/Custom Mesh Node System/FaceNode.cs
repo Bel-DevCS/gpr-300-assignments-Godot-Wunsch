@@ -67,7 +67,7 @@ public partial class FaceNode : Node3D
     {
         _isFlipped = !_isFlipped;
         UpdateFace();
-    }
+    }   
 
     public void GenerateFaceMesh()
     {
@@ -95,11 +95,15 @@ public partial class FaceNode : Node3D
         if (points2D.Count < 3) return;
 
         var indices = Geometry2D.TriangulatePolygon(points2D.ToArray());
-        if (indices.Length < 3)
+     
+        /*
+          if (indices.Length < 3)
         {
             GD.PrintErr("[FaceNode] Triangulation failed.");
             return;
         }
+         */
+       
 
         var st = new SurfaceTool();
         st.Begin(Mesh.PrimitiveType.Triangles);

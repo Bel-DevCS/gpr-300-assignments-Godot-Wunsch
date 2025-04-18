@@ -379,8 +379,5 @@ public partial class MeshBuilderNode : Node3D
             point.SetColor(Colors.Cyan);
         }
     }
-
-
-
-
+    
 }
