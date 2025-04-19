@@ -6,6 +6,7 @@ public partial class PointNode : Node3D
     public string Label { get; set; } = "Point";
     public Vector3 Scale = Vector3.One;
     public Color DebugColor = new Color(1, 0, 0);
+    public Shape ParentShape { get; set; } = null;
 
     private MeshInstance3D _debugSphere;
 

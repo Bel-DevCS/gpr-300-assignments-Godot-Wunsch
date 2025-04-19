@@ -1,7 +1,10 @@
 ﻿using Godot;
 using ImGuiNET;
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
+using Vector2 = System.Numerics.Vector2;
 
 public class MeshBuilderUI
 {
@@ -14,6 +17,10 @@ public class MeshBuilderUI
     private int _edgePointBIndex = 1;
 
     private PointNode _currentlyRenaming = null;
+    
+    private static Dictionary<string, Node3D> _draggedNodes = new();
+
+
 
     public MeshBuilderUI(MeshBuilderNode node)
     {
@@ -26,6 +33,12 @@ public class MeshBuilderUI
 
         if (ImGui.BeginTabBar("MeshTabs"))
         {
+            if (ImGui.BeginTabItem("Hierarchy"))
+            {
+                DrawHierarchy();
+                ImGui.EndTabItem();
+            }
+            
             if (ImGui.BeginTabItem("Points"))
             {
                 DrawPointEditor();
@@ -55,6 +68,7 @@ public class MeshBuilderUI
                 DrawLooping();
                 ImGui.EndTabItem();
             }
+
 
             ImGui.EndTabBar();
         }
@@ -331,4 +345,201 @@ public class MeshBuilderUI
         ImGui.Separator();
         ImGui.Button("Create Group (WIP)");
     }
+    
+private unsafe void DrawHierarchy()
+{
+    ImGui.Text("Hierarchy");
+    ImGui.Separator();
+
+    if (ImGui.Button("Add Point"))
+        _node.AddPoint(Vector3.Zero);
+
+    ImGui.SameLine();
+    if (ImGui.Button("Delete Point"))
+        GD.Print("Delete logic coming soon...");
+
+    ImGui.SameLine();
+    if (ImGui.Button("Add Shape"))
+        _node.CreateShape("Shape " + _node.Shapes.Count);
+
+    ImGui.Separator();
+
+    // === Ungrouped Lists ===
+    var ungroupedPoints = _node.GetPoints().Where(p => p.ParentShape == null).Cast<Node3D>();
+    if (ungroupedPoints.Any())
+        DrawNodeList("Points (Ungrouped)", ungroupedPoints);
+
+    var groupedEdges = _node.Shapes.SelectMany(s => s.Edges).ToHashSet();
+    var ungroupedEdges = _node.GetEdges().Where(e => !groupedEdges.Contains(e)).Cast<Node3D>();
+    if (ungroupedEdges.Any())
+        DrawNodeList("Edges (Ungrouped)", ungroupedEdges);
+
+    var groupedFaces = _node.Shapes.SelectMany(s => s.Faces).ToHashSet();
+    var ungroupedFaces = _node.GetFaces().Where(f => !groupedFaces.Contains(f)).Cast<Node3D>();
+    if (ungroupedFaces.Any())
+        DrawNodeList("Faces (Ungrouped)", ungroupedFaces);
+
+    // === Shapes ===
+    foreach (var shape in _node.Shapes)
+    {
+        ImGui.PushID(shape.GetHashCode());
+
+        if (ImGui.CollapsingHeader(shape.Name, ImGuiTreeNodeFlags.DefaultOpen))
+        {
+            // === Rename shape ===
+            byte[] shapeNameBuffer = new byte[32];
+            var nameBytes = System.Text.Encoding.UTF8.GetBytes(shape.Name);
+            Array.Copy(nameBytes, shapeNameBuffer, Math.Min(nameBytes.Length, shapeNameBuffer.Length));
+
+            if (ImGui.InputText("##ShapeName", shapeNameBuffer, (uint)shapeNameBuffer.Length, ImGuiInputTextFlags.EnterReturnsTrue))
+                shape.Name = System.Text.Encoding.UTF8.GetString(shapeNameBuffer).TrimEnd('\0');
+
+            // === Visual Drop Zone ===
+            ImGui.Text("Drop nodes here:");
+            ImGui.InvisibleButton($"DropZone_{shape.Name}", new Vector2(150, 20));
+
+            if (ImGui.BeginDragDropTarget())
+            {
+                var payload = ImGui.AcceptDragDropPayload("NODE3D");
+                if (payload.NativePtr != null)
+                {
+                    string payloadId = Marshal.PtrToStringAnsi(payload.Data, (int)payload.DataSize);
+
+                    if (_draggedNodes.TryGetValue(payloadId, out var node))
+                    {
+                        switch (node)
+                        {
+                            case PointNode point:
+                                _node.ChangeParentShape(point, shape);
+                                break;
+                            case EdgeNode edge:
+                                shape.AddEdge(edge);
+                                break;
+                            case FaceNode face:
+                                shape.AddFace(face);
+                                break;
+                        }
+
+                        GD.Print($"[Hierarchy] {node.Name} moved to shape {shape.Name}");
+                        _draggedNodes.Remove(payloadId);
+                    }
+                }
+                ImGui.EndDragDropTarget();
+            }
+
+            // === Show shape contents ===
+            DrawNodeList("Points", shape.Points.Cast<Node3D>());
+            DrawNodeList("Edges", shape.Edges.Cast<Node3D>());
+            DrawNodeList("Faces", shape.Faces.Cast<Node3D>());
+        }
+
+        ImGui.PopID();
+    }
+
+    // === Inspector ===
+    Vector2 hierarchySize = ImGui.GetWindowSize();
+    Vector2 hierarchyPos = ImGui.GetWindowPos();
+
+    ImGui.SetNextWindowPos(new Vector2(hierarchyPos.X + hierarchySize.X + 10, hierarchyPos.Y), ImGuiCond.Always);
+    ImGui.SetNextWindowSize(new Vector2(300, 200), ImGuiCond.FirstUseEver);
+    ImGui.Begin("Inspector");
+
+    if (_node.SelectedPoint != null)
+        DrawSelectedPointInfo(_node.SelectedPoint);
+    else if (_selectedEdge != null)
+        DrawSelectedEdgeInfo(_selectedEdge);
+    else if (_selectedFace != null)
+        DrawSelectedFaceInfo(_selectedFace);
+    else
+        ImGui.Text("No selection.");
+
+    ImGui.End();
+}
+
+private void DrawNodeList(string label, IEnumerable<Node3D> nodes)
+{
+    if (ImGui.TreeNode(label))
+    {
+        foreach (var node in nodes)
+        {
+            ImGui.PushID((int)node.GetInstanceId());
+
+            // Use distinct names to avoid conflict
+            string displayName = node switch
+            {
+                PointNode pointDisplay => pointDisplay.Label,
+                EdgeNode edge => $"{edge.PointA?.Label} → {edge.PointB?.Label}",
+                FaceNode => "Face",
+                _ => "Unknown"
+            };
+
+            bool isSelected = node == _node.SelectedPoint || node == _selectedEdge || node == _selectedFace;
+
+            if (ImGui.Selectable(displayName, isSelected))
+            {
+                switch (node)
+                {
+                    case PointNode pt:
+                        _node.SelectPoint(pt);
+                        break;
+                    case EdgeNode e:
+                        _selectedEdge = e;
+                        break;
+                    case FaceNode f:
+                        _selectedFace = f;
+                        break;
+                }
+            }
+
+            // Safe drag logic — different names, no conflict
+            if (node is PointNode dragPt && dragPt.ParentShape == null || node is EdgeNode || node is FaceNode)
+            {
+                if (ImGui.BeginDragDropSource())
+                {
+                    string payloadId = node.GetInstanceId().ToString();
+                    _draggedNodes[payloadId] = node;
+
+                    byte[] payloadData = System.Text.Encoding.UTF8.GetBytes(payloadId);
+                    IntPtr dataPtr = Marshal.AllocHGlobal(payloadData.Length);
+                    Marshal.Copy(payloadData, 0, dataPtr, payloadData.Length);
+                    ImGui.SetDragDropPayload("NODE3D", dataPtr, (uint)payloadData.Length);
+                    Marshal.FreeHGlobal(dataPtr);
+
+                    ImGui.Text($"Move: {displayName}");
+                    ImGui.EndDragDropSource();
+                }
+            }
+
+            ImGui.PopID();
+        }
+
+        ImGui.TreePop();
+    }
+}
+
+    private void DrawSelectedPointInfo(PointNode point)
+    {
+        ImGui.Text($"Point: {point.Label}");
+        var pos = new Vector3(point.Position.X, point.Position.Y, point.Position.Z);
+        var posVec = new System.Numerics.Vector3(pos.X, pos.Y, pos.Z);
+        if (ImGui.DragFloat3("Position", ref posVec, 0.05f))
+            point.Position = new Vector3(posVec.X, posVec.Y, posVec.Z);
+    }
+
+    private void DrawSelectedEdgeInfo(EdgeNode edge)
+    {
+        ImGui.Text($"Edge: {edge.PointA.Label} → {edge.PointB.Label}");
+        edge.Line.DrawImGui();
+        edge.UpdateEdge();
+    }
+
+    private void DrawSelectedFaceInfo(FaceNode face)
+    {
+        var color = face.FaceColor;
+        var c = new System.Numerics.Vector4(color.R, color.G, color.B, color.A);
+        if (ImGui.ColorEdit4("Face Color", ref c))
+            face.FaceColor = new Color(c.X, c.Y, c.Z, c.W);
+    }
+
+    
 }

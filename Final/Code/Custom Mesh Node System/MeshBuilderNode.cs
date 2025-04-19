@@ -26,6 +26,10 @@ public partial class MeshBuilderNode : Node3D
     private MeshBuilderUI _meshBuilderUI;
     
     private List<PointNode> _loopSelection = new();
+    
+    private List<Shape> _shapes = new();
+    public IReadOnlyList<Shape> Shapes => _shapes;
+
 
     public IReadOnlyList<PointNode> SelectedLoop => _loopSelection;
     
@@ -270,6 +274,8 @@ public partial class MeshBuilderNode : Node3D
     //
     public void GenerateTriangle(Vector3 center, float size = 1f)
     {
+        var shape = CreateShape("Triangle");
+
         Vector3 a = center + new Vector3(0, size, 0);
         Vector3 b = center + new Vector3(-size * 0.866f, -size * 0.5f, 0);
         Vector3 c = center + new Vector3(size * 0.866f, -size * 0.5f, 0);
@@ -278,15 +284,32 @@ public partial class MeshBuilderNode : Node3D
         var p1 = CreatePoint(b);
         var p2 = CreatePoint(c);
 
+        AddToShape(shape, p0);
+        AddToShape(shape, p1);
+        AddToShape(shape, p2);
+
         AddEdge(p0, p1);
         AddEdge(p1, p2);
         AddEdge(p2, p0);
 
+        var newEdges = _edges.Where(e =>
+            (e.PointA == p0 || e.PointA == p1 || e.PointA == p2) &&
+            (e.PointB == p0 || e.PointB == p1 || e.PointB == p2)).ToList();
+
+        foreach (var edge in newEdges)
+            AddToShape(shape, edge);
+
         AutoGenerateFace();
+
+        var newFace = _faces.LastOrDefault();
+        if (newFace != null)
+            AddToShape(shape, newFace);
     }
 
     public void GenerateSquare(Vector3 center, float size = 1f)
     {
+        var shape = CreateShape("Square");
+
         float half = size / 2f;
 
         Vector3 a = center + new Vector3(-half, half, 0);
@@ -301,12 +324,27 @@ public partial class MeshBuilderNode : Node3D
         var p2 = CreatePoint(c, baseIndex + 2);
         var p3 = CreatePoint(d, baseIndex + 3);
 
+        AddToShape(shape, p0);
+        AddToShape(shape, p1);
+        AddToShape(shape, p2);
+        AddToShape(shape, p3);
+
         TryAddEdge(p0, p1);
         TryAddEdge(p1, p2);
         TryAddEdge(p2, p3);
         TryAddEdge(p3, p0);
 
+        var newEdges = _edges.Where(e =>
+            (shape.Points.Contains(e.PointA) && shape.Points.Contains(e.PointB))).ToList();
+
+        foreach (var edge in newEdges)
+            AddToShape(shape, edge);
+
         AutoGenerateFace();
+
+        var newFace = _faces.LastOrDefault();
+        if (newFace != null)
+            AddToShape(shape, newFace);
     }
 
     private void TryAddEdge(PointNode a, PointNode b)
@@ -409,6 +447,53 @@ public partial class MeshBuilderNode : Node3D
             foreach (var point in GetPoints())
                 point.ShowDebug = _isEditing;
         }
+    }
+
+    public Shape CreateShape(string name = "Shape")
+    {
+        var shape = new Shape(name);
+        _shapes.Add(shape);
+        return shape;
+    }
+
+    public void AddToShape(Shape shape, Node3D node)
+    {
+        switch (node)
+        {
+            case PointNode point:
+                shape.AddPoint(point);
+                break;
+            case EdgeNode edge:
+                shape.AddEdge(edge);
+                break;
+            case FaceNode face:
+                shape.AddFace(face);
+                break;
+            default:
+                GD.PrintErr("Unsupported node type for shape.");
+                break;
+        }
+    }
+
+    public void TransformShape(Shape shape, Transform3D transform)
+    {
+        shape.ApplyTransform(transform);
+    }
+    
+    public void ChangeParentShape(PointNode point, Shape newShape)
+    {
+        if (point == null || newShape == null)
+            return;
+
+        // Remove from old shape
+        if (point.ParentShape != null)
+        {
+            point.ParentShape.Points.Remove(point);
+        }
+
+        // Add to new shape
+        newShape.AddPoint(point);
+        point.ParentShape = newShape;
     }
 
 
