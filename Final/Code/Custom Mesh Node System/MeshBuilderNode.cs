@@ -44,18 +44,18 @@ public partial class MeshBuilderNode : Node3D
     {
         _meshInstance = GetNode<MeshInstance3D>("LiveMesh");
         _meshInstance.Mesh = _mesh;
-        
-        _meshBuilderUI = new MeshBuilderUI(this);
-
         _gizmo = new Gizmo3D { Mode = Gizmo3D.ToolMode.Move };
         AddChild(_gizmo);
 
+        _meshBuilderUI = new MeshBuilderUI(this);
         GenerateMeshFromChildren();
     }
+
 
     public override void _Process(double delta)
     {
         UpdateSelectedPointFromGizmo();
+        ImGuiStyle.ApplyDarkModelingTheme();
         _meshBuilderUI.Draw();
     }
 
@@ -398,5 +398,18 @@ public partial class MeshBuilderNode : Node3D
         foreach (var edge in _edges)
             edge.SetEdgeVisible(!enabled);
     }
+    
+    private bool _isEditing = true;
+    public bool IsEditing
+    {
+        get => _isEditing;
+        set
+        {
+            _isEditing = value;
+            foreach (var point in GetPoints())
+                point.ShowDebug = _isEditing;
+        }
+    }
+
 
 }

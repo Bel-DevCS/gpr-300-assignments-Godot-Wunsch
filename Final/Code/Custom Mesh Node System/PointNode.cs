@@ -54,4 +54,15 @@ public partial class PointNode : Node3D
         if (_debugSphere != null && _debugSphere.MaterialOverride is StandardMaterial3D mat)
             mat.AlbedoColor = color;
     }
+    
+    public bool ShowDebug
+    {
+        get => _debugSphere?.Visible ?? false;
+        set
+        {
+            if (_debugSphere != null)
+                _debugSphere.Visible = value;
+        }
+    }
+
 }
