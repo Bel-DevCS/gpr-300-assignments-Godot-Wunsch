@@ -274,6 +274,11 @@ public class MeshBuilderUI
         bool editing = _node.IsEditing;
         if (ImGui.Checkbox("Obvious Points", ref editing))
             _node.IsEditing = editing;
+        
+        if (ImGui.Button("Toggle DrawShape Mode"))
+            _node.ToggleDrawShapeMode();
+
+
     }
 
     private void DrawLooping()

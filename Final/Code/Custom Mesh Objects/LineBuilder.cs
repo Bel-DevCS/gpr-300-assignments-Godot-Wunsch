@@ -182,6 +182,9 @@ public void DrawImGui()
         if (Mode == CurveMode.SineWave)
             ImGui.SliderFloat("Sine Phase", ref SinePhase, 0f, Mathf.Pi * 2);
     }
+    
+    if(ImGui.Button("Reset Curve"))
+        ResetLineVariables();
 }
 
 public MeshInstance3D CreateMeshInstance()

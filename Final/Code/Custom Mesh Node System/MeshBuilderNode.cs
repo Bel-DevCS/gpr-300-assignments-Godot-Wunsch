@@ -35,6 +35,12 @@ public partial class MeshBuilderNode : Node3D
     
     private bool _wireframeEnabled = false;
 
+    public bool _drawShapeMode = false;
+    private bool _drawAutoFace = true;
+    public List<PointNode> _drawPoints = new();
+    public Shape _currentDrawShape = null;
+
+
     
     public void ClearLoopSelection()
     {
@@ -61,6 +67,24 @@ public partial class MeshBuilderNode : Node3D
         UpdateSelectedPointFromGizmo();
         ImGuiStyle.ApplyDarkModelingTheme();
         _meshBuilderUI.Draw();
+        
+        if (_drawShapeMode)
+        {
+            ImGui.Begin("DrawShape Settings", ImGuiWindowFlags.AlwaysAutoResize);
+
+            if (ImGui.Button("Finish Shape") && _currentDrawShape != null)
+            {
+                TryGenerateFaceFromDrawPoints();
+                _drawPoints.Clear();
+               _currentDrawShape = null;
+               _drawShapeMode = false;
+            }
+
+            ImGui.Checkbox("Auto Draw Faces", ref _drawAutoFace);
+
+            ImGui.End();
+        }
+
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -75,6 +99,31 @@ public partial class MeshBuilderNode : Node3D
         {
             TrySelectPoint(mouseEvent.Position, Input.IsKeyPressed(Key.Shift));
         }
+        
+        if (_drawShapeMode && @event is InputEventMouseButton mEvent && mEvent.Pressed && mEvent.ButtonIndex == MouseButton.Left)
+        {
+            Vector3 pos = ProjectClickToGround(mEvent.Position);
+            var newPoint = CreatePoint(pos);
+            AddToShape(_currentDrawShape, newPoint);
+
+            if (_drawPoints.Count > 0)
+            {
+                var prev = _drawPoints.Last();
+                AddEdge(prev, newPoint);
+                AddToShape(_currentDrawShape, _edges.Last());
+            }
+
+            _drawPoints.Add(newPoint);
+
+            // Auto face if 3 or more
+            if (_drawAutoFace && _drawPoints.Count >= 3)
+                TryGenerateFaceFromDrawPoints();
+
+            return;
+        }
+
+        
+
     }
 
     public void TrySelectPoint(Vector2 mousePos, bool isShiftClick = false)
@@ -496,5 +545,68 @@ public partial class MeshBuilderNode : Node3D
         point.ParentShape = newShape;
     }
 
+    public void ToggleDrawShapeMode()
+    {
+        _drawShapeMode = !_drawShapeMode;
+        if (_drawShapeMode)
+        {
+            _drawPoints.Clear();
+            _currentDrawShape = CreateShape("DrawShape");
+        }
+    }
 
+    public void TryGenerateFaceFromDrawPoints()
+    {
+        if (_drawPoints.Count < 3)
+            return;
+
+        // Close the loop
+        var a = _drawPoints.Last();
+        var b = _drawPoints.First();
+
+        if (!EdgeExists(a, b))
+        {
+            AddEdge(a, b);
+            AddToShape(_currentDrawShape, _edges.Last());
+        }
+
+        // Build the face
+        var face = new FaceNode();
+        for (int i = 0; i < _drawPoints.Count; i++)
+        {
+            var p1 = _drawPoints[i];
+            var p2 = _drawPoints[(i + 1) % _drawPoints.Count];
+
+            var edge = _edges.FirstOrDefault(e =>
+                (e.PointA == p1 && e.PointB == p2) ||
+                (e.PointA == p2 && e.PointB == p1));
+
+            if (edge != null)
+                face.AddEdge(edge);
+        }
+
+        if (!FaceExists(face))
+        {
+            AddFace(face);
+            AddToShape(_currentDrawShape, face);
+        }
+    }
+
+    private Vector3 ProjectClickToGround(Vector2 mousePos)
+    {
+        var camera = GetViewport().GetCamera3D();
+        if (camera == null) return Vector3.Zero;
+
+        Vector3 origin = camera.ProjectRayOrigin(mousePos);
+        Vector3 direction = camera.ProjectRayNormal(mousePos);
+
+        var plane = new Plane(Vector3.Up, 0); // Y = 0 ground plane
+
+        Vector3? hit = plane.IntersectsRay(origin, direction);
+        return hit ?? origin + direction * 10f; // fallback if no intersection
+    }
+
+
+
+    
 }
