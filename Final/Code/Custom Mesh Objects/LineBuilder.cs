@@ -151,9 +151,15 @@ public void DrawImGui()
     var modes = Enum.GetNames(typeof(CurveMode));
     int selected = (int)Mode;
     if (ImGui.Combo("Curve Mode", ref selected, modes, modes.Length))
+    {
+        ResetLineVariables();
         Mode = (CurveMode)selected;
+    }
 
-    ImGui.SliderFloat("Curve Amount", ref CurveAmount, -5f, 5f);
+    float maxCurve = GetCurveAmountLimit(Mode);
+    CurveAmount = Mathf.Clamp(CurveAmount, -maxCurve, maxCurve);
+    ImGui.SliderFloat("Curve Amount", ref CurveAmount, -maxCurve, maxCurve);
+
 
     switch (Mode)
     {
@@ -220,6 +226,33 @@ public MeshInstance3D CreateMeshInstance()
     instance.AddChild(body);
     return instance;
 }
+
+public void ResetLineVariables()
+{
+    CurveAmount = 0f;
+    SegmentCount = 16;
+    Bias = new Vector3(0, 1, 0);
+    SineFrequency = 2f;
+    SinePhase = 0f;
+    SpiralLoops = 2;
+    SpiralTaper = 1f;
+}
+
+private float GetCurveAmountLimit(CurveMode mode)
+{
+    return mode switch
+    {
+        CurveMode.Linear     => 0f,
+        CurveMode.Quadratic  => 5f,
+        CurveMode.Cubic      => 4f,
+        CurveMode.Arc        => 3f,
+        CurveMode.SineWave   => 2.5f,
+        CurveMode.Sawtooth   => 2f,
+        CurveMode.ZigZag     => 2f,
+        _ => 5f
+    };
+}
+
 
 }
 

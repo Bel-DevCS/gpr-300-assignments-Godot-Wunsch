@@ -14,6 +14,8 @@ public class MeshBuilderUI
     private int _edgePointBIndex = 1;
 
     private PointNode _currentlyRenaming = null;
+    
+   // private bool _showWireframe = false;
 
     
     public MeshBuilderUI(MeshBuilderNode node)
@@ -189,6 +191,16 @@ public class MeshBuilderUI
 private void DrawFaceEditor()
 {
     if (!ImGui.Begin("Face Editor")) return;
+    
+  
+    bool wireframe = _node.GetViewport().DebugDraw == Viewport.DebugDrawEnum.Wireframe;
+
+    if (ImGui.Checkbox("Wireframe Mode", ref wireframe))
+    {
+        _node.SetWireframeEnabled(wireframe);
+    }
+    
+
 
     if (ImGui.CollapsingHeader("Face List", ImGuiTreeNodeFlags.DefaultOpen))
     {
@@ -221,10 +233,7 @@ private void DrawFaceEditor()
 
             if (ImGui.ColorEdit4("Face Color", ref c))
                 _selectedFace.FaceColor = new Color(c.X, c.Y, c.Z, c.W);
-
-            if (ImGui.Button("Flip Face"))
-                _selectedFace.Flip();
-
+            
             ImGui.SameLine();
             if (ImGui.Button("Clear Selection"))
                 _selectedFace = null;

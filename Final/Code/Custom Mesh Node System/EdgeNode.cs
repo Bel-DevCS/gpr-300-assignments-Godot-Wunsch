@@ -62,4 +62,11 @@ public partial class EdgeNode : Node3D
         if (!ConnectedFaces.Contains(face))
             ConnectedFaces.Add(face);
     }
+    
+    public void SetEdgeVisible(bool visible)
+    {
+        if (_lineMesh != null)
+            _lineMesh.Visible = visible;
+    }
+
 }

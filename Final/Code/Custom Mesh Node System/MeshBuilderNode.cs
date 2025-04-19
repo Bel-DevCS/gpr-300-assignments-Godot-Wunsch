@@ -28,6 +28,10 @@ public partial class MeshBuilderNode : Node3D
     private List<PointNode> _loopSelection = new();
 
     public IReadOnlyList<PointNode> SelectedLoop => _loopSelection;
+    
+    private bool _wireframeEnabled = false;
+
+    
     public void ClearLoopSelection()
     {
         foreach (var p in _loopSelection)
@@ -380,4 +384,19 @@ public partial class MeshBuilderNode : Node3D
         }
     }
     
+    public void SetWireframeEnabled(bool enabled)
+    {
+        _wireframeEnabled = enabled;
+
+        // Set global debug draw
+        RenderingServer.SetDebugGenerateWireframes(true);
+        GetViewport().DebugDraw = enabled
+            ? Viewport.DebugDrawEnum.Wireframe
+            : Viewport.DebugDrawEnum.Disabled;
+
+        // Hide or show edges accordingly
+        foreach (var edge in _edges)
+            edge.SetEdgeVisible(!enabled);
+    }
+
 }
