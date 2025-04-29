@@ -1,0 +1,28 @@
+Loading Instructions : 
+
+This project was built on Godot 4.4 .NET (to enable c#)
+IF they aren't included, two required assets are 
+-Gizmo3D 
+-imgui-godot
+
+(Though I believe it automatically should install the updates)
+
+The requirements to run the project also include the nugget package ImGui.NET
+
+//Other major change : 
+The .csproj (if not included) needs to look like this (to account for ImGui to work)
+
+<Project Sdk="Godot.NET.Sdk/4.4.0-dev.6">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'android' ">net8.0</TargetFramework>
+    <TargetFramework Condition=" '$(GodotTargetPlatform)' == 'ios' ">net8.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>GPR300Assignments</RootNamespace>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ImGui.NET" Version="1.91.6.1" />
+  </ItemGroup>
+</Project>
+
