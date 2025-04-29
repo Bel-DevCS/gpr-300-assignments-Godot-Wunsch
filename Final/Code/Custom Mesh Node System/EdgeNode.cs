@@ -43,12 +43,12 @@ public partial class EdgeNode : Node3D
 
         if (_lineMesh != null)
         {
-            _lineMesh.Mesh = Line.GetImmediateMesh(); // Add getter below
+            _lineMesh.Mesh = Line.GetImmediateMesh();
             _lineMesh.MaterialOverride = _lineMaterial;
         }
-
+        
         foreach (var face in ConnectedFaces)
-            face.UpdateFace();
+            face.GenerateFaceMesh();
     }
 
     public void SetHighlighted(bool highlighted)

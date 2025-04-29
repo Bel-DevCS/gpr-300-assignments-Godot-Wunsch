@@ -389,7 +389,13 @@ private unsafe void DrawHierarchy()
     {
         ImGui.PushID(shape.GetHashCode());
 
-        if (ImGui.CollapsingHeader(shape.Name, ImGuiTreeNodeFlags.DefaultOpen))
+        bool shapeOpen = ImGui.CollapsingHeader(shape.Name, ImGuiTreeNodeFlags.DefaultOpen);
+        if (ImGui.IsItemClicked() && !ImGui.IsItemToggledOpen())
+        {
+            _node.SelectShape(shape); // This selects all the points in the shape
+        }
+
+        if (shapeOpen)
         {
             // === Rename shape ===
             byte[] shapeNameBuffer = new byte[32];
@@ -399,7 +405,7 @@ private unsafe void DrawHierarchy()
             if (ImGui.InputText("##ShapeName", shapeNameBuffer, (uint)shapeNameBuffer.Length, ImGuiInputTextFlags.EnterReturnsTrue))
                 shape.Name = System.Text.Encoding.UTF8.GetString(shapeNameBuffer).TrimEnd('\0');
 
-            // === Visual Drop Zone ===
+            // === Drop Target, etc ===
             ImGui.Text("Drop nodes here:");
             ImGui.InvisibleButton($"DropZone_{shape.Name}", new Vector2(150, 20));
 
@@ -409,7 +415,6 @@ private unsafe void DrawHierarchy()
                 if (payload.NativePtr != null)
                 {
                     string payloadId = Marshal.PtrToStringAnsi(payload.Data, (int)payload.DataSize);
-
                     if (_draggedNodes.TryGetValue(payloadId, out var node))
                     {
                         switch (node)
@@ -432,7 +437,6 @@ private unsafe void DrawHierarchy()
                 ImGui.EndDragDropTarget();
             }
 
-            // === Show shape contents ===
             DrawNodeList("Points", shape.Points.Cast<Node3D>());
             DrawNodeList("Edges", shape.Edges.Cast<Node3D>());
             DrawNodeList("Faces", shape.Faces.Cast<Node3D>());

@@ -65,33 +65,41 @@ public partial class FaceNode : Node3D
             return;
 
         var points3D = new List<Vector3>();
-        var seen = new HashSet<Vector3>();
 
-        foreach (var edge in Edges)
+        points3D.Clear();
+
+        for (int e = 0; e < Edges.Count; e++)
         {
-            foreach (var p in edge.Line.Points)
-            {
-                Vector3 rounded = new Vector3(
-                    Mathf.Round(p.X * 1000f) / 1000f,
-                    Mathf.Round(p.Y * 1000f) / 1000f,
-                    Mathf.Round(p.Z * 1000f) / 1000f
-                );
+            var edge = Edges[e];
+            if (edge.Line?.Points == null || edge.Line.Points.Count == 0)
+                continue;
 
-                if (seen.Add(rounded))
-                    points3D.Add(rounded);
+            // If first edge, add all points
+            if (e == 0)
+            {
+                points3D.AddRange(edge.Line.Points);
+            }
+            else
+            {
+                // For subsequent edges, skip the first point (to avoid duplicates)
+                points3D.AddRange(edge.Line.Points.Skip(1));
             }
         }
+
 
         if (points3D.Count < 3)
             return;
 
-        // Build plane from first 3 points
+        TriangulateAndRender(points3D);
+    }
+
+    private void TriangulateAndRender(List<Vector3> points3D)
+    {
         Vector3 normal = (points3D[1] - points3D[0]).Cross(points3D[2] - points3D[0]).Normalized();
         Vector3 tangent = (points3D[1] - points3D[0]).Normalized();
         Vector3 bitangent = normal.Cross(tangent).Normalized();
         Vector3 origin = points3D[0];
 
-        // Project 3D points to 2D using this basis
         List<Vector2> points2D = points3D.Select(p =>
         {
             Vector3 relative = p - origin;
@@ -108,7 +116,6 @@ public partial class FaceNode : Node3D
         for (int i = 0; i < indices.Length; i++)
             st.AddVertex(points3D[indices[i]]);
 
-
         var newMesh = new ArrayMesh();
         st.Commit(newMesh);
 
@@ -117,7 +124,7 @@ public partial class FaceNode : Node3D
             _meshInstance.Mesh = newMesh;
             _meshInstance.MaterialOverride = _material;
         }
-        
     }
+
 
 }

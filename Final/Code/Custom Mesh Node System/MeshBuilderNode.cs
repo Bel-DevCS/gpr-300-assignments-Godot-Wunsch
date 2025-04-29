@@ -30,6 +30,8 @@ public partial class MeshBuilderNode : Node3D
     private List<Shape> _shapes = new();
     public IReadOnlyList<Shape> Shapes => _shapes;
 
+    private Shape _selectedShape = null;
+
 
     public IReadOnlyList<PointNode> SelectedLoop => _loopSelection;
     
@@ -59,6 +61,7 @@ public partial class MeshBuilderNode : Node3D
 
         _meshBuilderUI = new MeshBuilderUI(this);
         GenerateMeshFromChildren();
+
     }
 
 
@@ -74,11 +77,45 @@ public partial class MeshBuilderNode : Node3D
 
             if (ImGui.Button("Finish Shape") && _currentDrawShape != null)
             {
-                TryGenerateFaceFromDrawPoints();
+                if (_drawPoints.Count >= 3)
+                {
+                    // Link last point to first if not already linked
+                    var a = _drawPoints.Last();
+                    var b = _drawPoints.First();
+
+                    if (!EdgeExists(a, b))
+                    {
+                        AddEdge(a, b);
+                        AddToShape(_currentDrawShape, _edges.Last());
+                    }
+
+                    // Then build one complete face
+                    var face = new FaceNode();
+                    for (int i = 0; i < _drawPoints.Count; i++)
+                    {
+                        var p1 = _drawPoints[i];
+                        var p2 = _drawPoints[(i + 1) % _drawPoints.Count];
+
+                        var edge = _edges.FirstOrDefault(e =>
+                            (e.PointA == p1 && e.PointB == p2) ||
+                            (e.PointA == p2 && e.PointB == p1));
+
+                        if (edge != null)
+                            face.AddEdge(edge);
+                    }
+
+                    if (!FaceExists(face))
+                    {
+                        AddFace(face);
+                        AddToShape(_currentDrawShape, face);
+                    }
+                }
+
                 _drawPoints.Clear();
-               _currentDrawShape = null;
-               _drawShapeMode = false;
+                _currentDrawShape = null;
+                _drawShapeMode = false;
             }
+
 
             ImGui.Checkbox("Auto Draw Faces", ref _drawAutoFace);
 
@@ -112,6 +149,7 @@ public partial class MeshBuilderNode : Node3D
                 AddEdge(prev, newPoint);
                 AddToShape(_currentDrawShape, _edges.Last());
             }
+
 
             _drawPoints.Add(newPoint);
 
@@ -181,34 +219,70 @@ public partial class MeshBuilderNode : Node3D
     {
         if (_selectedPoint != null)
             _gizmo.Deselect(_selectedPoint);
+        else if (_selectedShape != null)
+            _gizmo.Deselect(this);
 
+        _gizmo.Visible = false;
         _selectedPoint = null;
+        _selectedShape = null;
+        ClearLoopSelection();
+
     }
 
     public void UpdateSelectedPointFromGizmo()
     {
         if (_selectedPoint != null)
         {
-            // Update the actual point’s position based on gizmo
             _selectedPoint.Position = _selectedPoint.GlobalPosition;
 
-            // Rebuild any edges connected to this point
             foreach (var edge in _edges)
             {
                 if (edge.PointA == _selectedPoint || edge.PointB == _selectedPoint)
                 {
                     edge.UpdateEdge();
-
-                    // Rebuild any faces using this edge
                     foreach (var face in edge.ConnectedFaces)
-                    {
                         face.UpdateFace();
-                    }
                 }
             }
         }
+        else if (_selectedShape != null)
+        {
+            // Compute center of the shape
+            Vector3 shapeCenter = _selectedShape.Points.Aggregate(Vector3.Zero, (sum, p) => sum + p.GlobalPosition) / _selectedShape.Points.Count;
+
+            // Get the gizmo's new position
+            Vector3 newCenter = _gizmo.GlobalTransform.Origin;
+
+            // Compute the delta offset
+            Vector3 delta = newCenter - shapeCenter;
+
+            if (delta.LengthSquared() > 0.0001f)
+            {
+                // Move each point by delta
+                foreach (var point in _selectedShape.Points)
+                    point.Position += delta; // Not GlobalPosition!
+
+                // Update all edges (which should also update Line.Points internally)
+                foreach (var edge in _selectedShape.Edges)
+                {
+                    edge.UpdateEdge();
+                    // Optional: explicitly force Line update if UpdateEdge() doesn’t do it
+                    // edge.Line.Points = new[] { edge.PointA.GlobalPosition, edge.PointB.GlobalPosition };
+                }
+                
+                foreach (var face in _selectedShape.Faces)
+                {
+                    face.GenerateFaceMesh();
+                }
+
+
+                // Re-center gizmo at new average center
+                var newShapeCenter = _selectedShape.Points.Aggregate(Vector3.Zero, (sum, p) => sum + p.GlobalPosition) / _selectedShape.Points.Count;
+                _gizmo.GlobalTransform = new Transform3D(Basis.Identity, newShapeCenter);
+            }
+        }
     }
-    
+
     public void AddPoint(Vector3 pos)
     {
         var point = new PointNode
@@ -523,11 +597,35 @@ public partial class MeshBuilderNode : Node3D
                 break;
         }
     }
+    
+    public void SelectShape(Shape shape)
+    {
+        if (shape == null || shape.Points.Count == 0)
+            return;
+
+        ClearLoopSelection();
+        DeselectPoint();
+
+        _selectedShape = shape;
+
+        foreach (var point in shape.Points)
+        {
+            _loopSelection.Add(point);
+            point.SetColor(Colors.Cyan);
+        }
+
+        var center = shape.Points.Aggregate(Vector3.Zero, (sum, p) => sum + p.Position) / shape.Points.Count;
+        _gizmo.GlobalTransform = new Transform3D(Basis.Identity, center);
+        _gizmo.Select(this); // You can use 'this' or just leave it null
+        _gizmo.Visible = true;
+    }
+
 
     public void TransformShape(Shape shape, Transform3D transform)
     {
         shape.ApplyTransform(transform);
     }
+    
     
     public void ChangeParentShape(PointNode point, Shape newShape)
     {
@@ -548,34 +646,38 @@ public partial class MeshBuilderNode : Node3D
     public void ToggleDrawShapeMode()
     {
         _drawShapeMode = !_drawShapeMode;
+
         if (_drawShapeMode)
         {
             _drawPoints.Clear();
             _currentDrawShape = CreateShape("DrawShape");
+
+            ForceCameraTopDown();
         }
     }
+
 
     public void TryGenerateFaceFromDrawPoints()
     {
         if (_drawPoints.Count < 3)
             return;
 
-        // Close the loop
-        var a = _drawPoints.Last();
-        var b = _drawPoints.First();
+        // Close the loop if not already
+        var first = _drawPoints.First();
+        var last = _drawPoints.Last();
 
-        if (!EdgeExists(a, b))
+        if (!EdgeExists(last, first))
         {
-            AddEdge(a, b);
+            AddEdge(last, first);
             AddToShape(_currentDrawShape, _edges.Last());
         }
 
-        // Build the face
+        // Now make a face
         var face = new FaceNode();
         for (int i = 0; i < _drawPoints.Count; i++)
         {
             var p1 = _drawPoints[i];
-            var p2 = _drawPoints[(i + 1) % _drawPoints.Count];
+            var p2 = _drawPoints[(i + 1) % _drawPoints.Count]; // Wraps automatically
 
             var edge = _edges.FirstOrDefault(e =>
                 (e.PointA == p1 && e.PointB == p2) ||
@@ -605,8 +707,17 @@ public partial class MeshBuilderNode : Node3D
         Vector3? hit = plane.IntersectsRay(origin, direction);
         return hit ?? origin + direction * 10f; // fallback if no intersection
     }
-
-
-
     
+    private void ForceCameraTopDown()
+    {
+        var camera = GetViewport().GetCamera3D();
+        if (camera == null)
+            return;
+
+      
+        camera.GlobalPosition = new Vector3(0, 10, 0);
+        camera.LookAt(Vector3.Zero, Vector3.Forward); // Up vector = Forward
+    }
+
 }
+

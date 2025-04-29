@@ -1,0 +1,26 @@
+[gd_scene load_steps=6 format=3 uid="uid://cdepvmi3dttli"]
+
+[ext_resource type="Script" uid="uid://b5182owpayhpn" path="res://Final/Code/Custom Mesh Node System/MeshBuilderNode.cs" id="1_cj82u"]
+[ext_resource type="Script" uid="uid://ybucn82ajt2i" path="res://Final/Code/Custom Mesh Node System/PointNode.cs" id="2_o678q"]
+[ext_resource type="Script" uid="uid://bmfct42qqnctq" path="res://Final/Code/Custom Mesh Node System/EdgeNode.cs" id="3_vtkhp"]
+[ext_resource type="Script" uid="uid://cbjkmupes7jmd" path="res://Final/Code/Custom Mesh Node System/FaceNode.cs" id="4_htqo1"]
+[ext_resource type="Script" uid="uid://b6sepxffluwo2" path="res://Final/Code/Final_CameraController.cs" id="5_o678q"]
+
+[node name="Object" type="Node3D"]
+script = ExtResource("1_cj82u")
+
+[node name="PointsRoot" type="Node3D" parent="."]
+script = ExtResource("2_o678q")
+
+[node name="EdgesRoot" type="Node3D" parent="."]
+script = ExtResource("3_vtkhp")
+
+[node name="FacesRoot" type="Node3D" parent="."]
+script = ExtResource("4_htqo1")
+
+[node name="LiveMesh" type="MeshInstance3D" parent="."]
+
+[node name="ImGui_UI" type="Node" parent="."]
+
+[node name="Camera3D" type="Camera3D" parent="."]
+script = ExtResource("5_o678q")
